@@ -40,7 +40,8 @@ server <- function(input, output, session) {
   output$table <- renderTable({
     selectedData()
   })
-  
+
+  # Output selected dataset/variable as histogram using ggplot2
   output$hist <- renderPlot({
     data <- selectedData()
     var <- selectedVariable()
@@ -54,7 +55,7 @@ server <- function(input, output, session) {
     }
   })
   
-  # Output the selected dataset as a box plot using ggplot2
+  # Output selected dataset/variable as box plot using ggplot2
   output$box <- renderPlot({
     data <- selectedData()
     var <- selectedVariable()
