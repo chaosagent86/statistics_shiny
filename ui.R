@@ -31,7 +31,7 @@ ui <- fluidPage(
       # Conditional panel for histogram
       conditionalPanel(
         condition = "input.display == 'Histogram'",
-        sliderInput("bins", "Number of bins:", min = 5, max = 20, value = 10)
+        sliderInput("bins", "Number of bins:", min = 5, max = 30, value = 10)
       )
     ),
     
