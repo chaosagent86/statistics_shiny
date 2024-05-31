@@ -80,7 +80,7 @@ server <- function(input, output, session) {
     }
   })
   
-  # Output the selected dataset as a Q-Q plot using ggplot2
+  # Output selected dataset/variable as Q-Q plot using ggplot2
   output$qq <- renderPlot({
     data <- selectedData()
     var <- selectedVariable()
@@ -94,7 +94,7 @@ server <- function(input, output, session) {
     }
   })
   
-  # Output the selected dataset as an ECDF plot using ggplot2
+  # Output selected dataset as ECDF plot using ggplot2
   output$ecdf <- renderPlot({
     data <- selectedData()
     var <- selectedVariable()
