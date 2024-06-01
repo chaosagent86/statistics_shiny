@@ -2,6 +2,7 @@ library(shiny)
 library(brochure)
 library(ggplot2)
 library(tidyr)
+library(dplyr)
 
 #Server code of the app
 server <- function(input, output, session) {
@@ -40,8 +41,7 @@ server <- function(input, output, session) {
   output$table <- renderTable({
     selectedData()
   })
-
-  # Output selected dataset/variable as histogram using ggplot2
+  
   output$hist <- renderPlot({
     data <- selectedData()
     var <- selectedVariable()
@@ -49,13 +49,13 @@ server <- function(input, output, session) {
     if (!is.null(var) && is.numeric(data[[var]])) {
       ggplot(data, aes_string(x = var)) +
         geom_histogram(bins = bins, fill = "blue", color = "black") +
-        labs(title = paste("Histogram of", var), x = var, y = "Frequency")
+        labs(title = paste("Histogram \n[", var, "]"), x = var, y = "Frequency")
     } else {
       displayError()
     }
   })
   
-  # Output selected dataset/variable as box plot using ggplot2
+  # Output the selected dataset as a box plot using ggplot2
   output$box <- renderPlot({
     data <- selectedData()
     var <- selectedVariable()
@@ -65,7 +65,7 @@ server <- function(input, output, session) {
           pivot_longer(cols = everything(), names_to = "variable", values_to = "value")
         ggplot(data_long, aes(x = variable, y = value)) +
           geom_boxplot(fill = "blue", color = "black") +
-          labs(title = "Box Plot (all variables)", x = "Variable", y = "Value")
+          labs(title = "Box Plot \n[all variables]", x = "Variable", y = "Value")
       } else {
         displayError()
       }
@@ -73,14 +73,14 @@ server <- function(input, output, session) {
       if (!is.null(var) && is.numeric(data[[var]])) {
         ggplot(data, aes_string(y = var)) +
           geom_boxplot(fill = "blue", color = "black") +
-          labs(title = paste("Box Plot (", var, ")"), y = var)
+          labs(title = paste("Box Plot \n[", var, "]"), y = var)
       } else {
         displayError()
       }
     }
   })
   
-  # Output selected dataset/variable as Q-Q plot using ggplot2
+  # Output the selected dataset as a Q-Q plot using ggplot2
   output$qq <- renderPlot({
     data <- selectedData()
     var <- selectedVariable()
@@ -88,20 +88,20 @@ server <- function(input, output, session) {
       ggplot(data, aes_string(sample = var)) +
         geom_qq() +
         geom_qq_line(color = "red") +
-        labs(title = paste("Q-Q Plot of", var))
+        labs(title = paste("Q-Q Plot \n[", var, "]"))
     } else {
       displayError()
     }
   })
   
-  # Output selected dataset as ECDF plot using ggplot2
+  # Output the selected dataset as an ECDF plot using ggplot2
   output$ecdf <- renderPlot({
     data <- selectedData()
     var <- selectedVariable()
     if (!is.null(var) && is.numeric(data[[var]])) {
       ggplot(data, aes_string(x = var)) +
         stat_ecdf(geom = "step", color = "blue") +
-        labs(title = paste("ECDF Plot of", var), x = var, y = "ECDF")
+        labs(title = paste("ECDF Plot \n[", var, "]"), x = var, y = "ECDF")
     } else {
       displayError()
     }
