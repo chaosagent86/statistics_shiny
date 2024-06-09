@@ -14,12 +14,20 @@ ui <- fluidPage(
       
       # Dropdown menu for display type selection
       selectInput("display", "Choose display type:",
-                  choices = c("Data Table", "Histogram", "Box Plot", "Q-Q Plot", "ECDF Plot", "Scatter Plot Matrix")),
+                  choices = c("Data Table", "Histogram", "Box Plot", "Q-Q Plot", "ECDF Plot", "Scatter Plot Matrix", "Scatter Plot")),
       
       # Conditional panel for variable selection single
       conditionalPanel(
-        condition = "input.display != 'Data Table' && input.display != 'Scatter Plot Matrix'",
+        condition = "input.display != 'Data Table' && input.display != 'Scatter Plot Matrix' && input.display != 'Scatter Plot'",
         uiOutput("variableSelect")
+      ),
+      
+      # Conditional panel for scatter plot variable selection
+      conditionalPanel(
+        condition = "input.display == 'Scatter Plot'",
+        selectInput("scatter_x", "Choose X variable:", choices = NULL),
+        selectInput("scatter_y", "Choose Y variable:", choices = NULL),
+        checkboxInput("log_transform", "Log transform variables", value = FALSE)
       ),
       
       # Conditional panel for box plot
@@ -60,6 +68,10 @@ ui <- fluidPage(
       conditionalPanel(
         condition = "input.display == 'Scatter Plot Matrix'",
         plotOutput("scatter_matrix")
+      ),
+      conditionalPanel(
+        condition = "input.display == 'Scatter Plot'",
+        plotOutput("scatter")
       )
     )
   )
