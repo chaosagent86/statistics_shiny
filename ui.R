@@ -10,11 +10,22 @@ ui <- fluidPage(
     sidebarPanel(
       # Dropdown menu for selecting dataset
       selectInput("dataset", "Choose dataset:",
-                  choices = c("swiss", "state.x77", "UN", "LakeHuron", "Titanic", "PimaIndians", "PipettingTraining", "BacterialCulture", "Salary")),
+                  choices = c("Titanic", "state.x77", "UN", "LakeHuron", "swiss", "PimaIndians", "PipettingTraining", "BacterialCulture", "Salary")),
       
       # Dropdown menu for display type selection
+      #am Ende Data Table wieder an den Anfang stellen
       selectInput("display", "Choose display type:",
-                  choices = c("Data Table", "Histogram", "Box Plot", "Q-Q Plot", "ECDF Plot", "Scatter Plot Matrix", "Scatter Plot", "Mosaic Plot")),
+                  choices = c("Mosaic Plot", "Histogram", "Box Plot", "Q-Q Plot", "ECDF Plot", "Scatter Plot Matrix", "Scatter Plot", "Data Table")),
+      
+      #Dropdown Menu for Mosaic Plot
+      conditionalPanel(
+        condition = "input.display == 'Mosaic Plot'",
+        selectInput("MosaicPlotColumns", "Choose Columns to show:\n(multiple select possible)",
+                    choices = c("Class", "Sex", "Age", "Survived"),
+                    multiple=TRUE,
+                    selected=c("Class", "Sex", "Age", "Survived")
+                    )
+      ),
       
       # Conditional panel for variable selection single
       conditionalPanel(

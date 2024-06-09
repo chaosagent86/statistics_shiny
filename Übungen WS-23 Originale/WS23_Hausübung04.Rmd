@@ -1,0 +1,751 @@
+---
+title: "Hausübung 04 - Lineare Regression"
+author: "Baier Sebastian, Figlmüller Magdalena, Schwarzböck Alice"
+date: "29.11.2023"
+output: 
+  pdf_document: 
+    toc: yes
+    toc_depth: 5
+---
+
+# Allgemeine Hinweise zur Übung
+
+**Für alle Beispiele gelten folgende Aufgabenstellungen:**
+
+* Überprüfen Sie alle erforderlichen statistischen Voraussetzungen für die Gültigkeit dieses Modells mtihilfe der quality plots der Residuen und gegebenenfalls Scatterplots.
+* Führen Sie eine Modellselektion durch und wählen anhand statistischer Kriterien ein optimales Modell aus. Argumentieren Sie anhand Kriterien für die Signifkanz von Koeffizienten und gegebenenfalls zusätzlich von Modellen.
+* Schreiben Sie das Regressionsmodell und die angepasste Modellgleichung des optimalen Modells explizit an.
+* Interpretieren Sie die Werte die Koeffizienten im Sachzusammenhang.
+
+# Aufgabe 1: Datentransformation
+
+* Wählen Sie den Datensatz UN aus der library 'car'.
+* Filtern Sie erst 'NA' mit der Funktion na.omit.
+* Erklären Sie dann infant mortality durch gross domestic product.
+* Explorieren Sie die Daten, bevor Sie ein Modell anpassen.
+
+```{r setup, include=FALSE, , message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(magrittr)
+library(car)
+library(ggplot2)
+library(gridExtra)
+library(psych)
+```
+
+In diesem Datensatz sollen nun, wie oben beschrieben, die Infant Mortality (Säuglingssterblichkeit) und das Gross Domestic Product (Bruttoinlandsprodukt) erklärt werden. Hierfür schauen wir uns zuerst die Daten etwas genauer an um anschließend ein Modell dafür zu erstellen.
+
+**Beschreibung des Datensatzes:**
+* **region:** Größere Regionen in der Welt, jedoch nicht zwingend Kontinente (Original [en]: Region of the world: Africa, Asia, Caribbean, Europe, Latin Amer, North America, NorthAtlantic, Oceania)
+* **group:** Beschreibender Faktor, welcher beinhaltet, ob Länder der OECD oder anden Organisationen angehören (Original [en]:  A factor with levels oecd for countries that are members of the OECD, the Organization for Economic Co-operation and Development, as of May 2012, africa for countries on the African continent, and other for all other countries. No OECD countries are located in Africa.)
+* **fertility:** Fruchtbarkeitsrate als Zahl der Kinder/Frau (Original [en]: Total fertility rate, number of children per woman.)
+* **ppgdp:** Bruttoinlandsprodukt in US-Dollar (Original [en]: Per capita gross domestic product in US dollars.)
+* **pctUrban:** Prozent des Stadtanteils (Original [en]: Percent urban.)
+* **infantMortality:** Todesfällen bei Säuglingen im Alter von einem Jahr je 1.000 Lebendgeburten (Original [en]: Infant deaths by age 1 year per 1000 live births)
+
+Zuerst filtern wir den Datensatz mittels na.omit, was wir wie folgt durchführen und uns anschließend die Datenstruktur via glimpse ausgeben lassen.
+
+```{r aufg1-1, echo=TRUE}
+UN_new <- UN %>% na.omit()
+glimpse(UN_new)
+summary(UN_new$infantMortality)
+summary(UN_new$ppgdp)
+```
+
+Die Originaldaten enthielten `r nrow(UN)` Zeilen, während die gefilterten Daten nur mehr `r nrow(UN_new)` Zeilen enthalten. Es wurden daher `r nrow(UN)-nrow(UN_new)` Zeilen herausgefiltert.
+
+Was weiterhin auffällt, ist, dass der arithmetische Mittelwert von infantmortality mit `r options(digits=3); mean(UN_new$infantMortality)` gegenüber dem Median mit `r median(UN_new$infantMortality)` deutlich abweicht.
+
+Noch deutlich stärker wird dieser Effekt beim Bruttoinlandsprodukt 'ppdgdp' sichtbar. Hier ist der arithmetische Mittelwert mit `r options(digits=3);mean(UN_new$ppgdp)` gegenüber dem Median mit `r median(UN_new$ppgdp)` noch unterschiedlicher.
+
+In beiden Fällen ist hier möglicherweise eine Schiefe der Daten zu erwarten.
+
+In Folge wird der Datensatz exploratorisch weiter untersucht.
+
+## Explorative Analyse - Infant Mortality
+
+```{r infants, eval=TRUE, message=FALSE, warning=FALSE, include=TRUE, echo=FALSE}
+
+infantMortality_qqplot <- ggplot(UN_new, aes(sample=UN_new$infantMortality))+
+  stat_qq()+
+  stat_qq_line(colour = "red")+
+  ggtitle("Q-Q-Plot Infant Mortality")+
+  xlab("Theoretical Quantiles")+
+  ylab("Sample Quantiles")
+
+infantMortality_hist <- ggplot(UN_new, aes(x = `infantMortality`))+
+  geom_histogram(aes(x = `infantMortality`, y = ..density..),bins = 15, fill = "grey", color = "black")+
+  geom_density(aes(x = `infantMortality`, y = ..density.. ),color = "red")+
+  ggtitle("Histogramm Infant Mortality")+
+  xlab("Infant Mortality [per 1000]")+
+  ylab("Density")
+
+infantMortality_boxplot <- ggplot(UN_new, aes(x=`infantMortality`, y=""))+
+  geom_boxplot(fill = "grey", color = "black")+
+  ggtitle("Boxplot Infant Mortality")+
+  xlab("Infant Mortality [per 1000]")
+  ylab("")
+
+grid.arrange(infantMortality_qqplot, infantMortality_hist, infantMortality_boxplot, nrow=2)
+```
+
+Auffällig im QQ-Plot ist der schwere Rand auf der linken Seite des Plots. Dies wird auch die Skweness von `r psych::skew(UN_new$infantMortality)` bestätigt. 
+
+Dies wird auch durch das Histogramm belegt, welches eine Spitze bei etwa 12 von 1000 Säuglingen in der Säuglingssterblichkeit zeigt. Dies weicht deutlich vom arithmetischen Mittelwert (`r mean(UN_new$infantMortality)`) und dem Median (`r median(UN_new$infantMortality)`) ab.
+
+Diese Schiefe wird im Boxplot ebenfalls nochmal sehr gut sichtbar. Anzumerken ist hierbei, dass Boxplots für normalverteilte optimal sind. Die hier dargestellten Ausreißer, müssen demnach keine Ausreißer sein sondern werden als solche dargsetellt, da diese aufgrund der Schiefe außerhalb des Quantiles des Boxplots liegen.
+
+Zusammenfassend zeigt sich jedoch die Unimodalität und Rechtsschiefe der Daten.
+
+## Explorative Analyse - Gross Domestic Product
+
+```{r GDP, eval=TRUE, message=FALSE, warning=FALSE, include=TRUE, echo=FALSE}
+
+gdp_qqplot <- ggplot(UN_new, aes(sample=UN_new$ppgdp))+
+  stat_qq()+
+  stat_qq_line(colour = "red")+
+  ggtitle("Q-Q-Plot Infant Mortality")+
+  xlab("Theoretical Quantiles")+
+  ylab("Sample Quantiles")
+
+gdp_hist <- ggplot(UN_new, aes(x = `ppgdp`))+
+  geom_histogram(aes(x = `ppgdp`, y = ..density..),bins = 15, fill = "grey", color = "black")+
+  geom_density(aes(x = `ppgdp`, y = ..density.. ),color = "red")+
+  ggtitle("Histogramm Gross Domestic Product")+
+  xlab("Gross Domestic Product [US Dollar]")+
+  ylab("Density")
+
+gdp_boxplot <- ggplot(UN_new, aes(x=`ppgdp`, y=""))+
+  geom_boxplot(fill = "grey", color = "black")+
+  ggtitle("Boxplot Gross Domestic Product")+
+  xlab("Gross Domestic Product [US Dollar]")
+  ylab("")
+
+grid.arrange(gdp_qqplot, gdp_hist, gdp_boxplot, nrow=2)
+```
+
+Auffällig im QQ-Plot ist der extrem schwere Rand auf der rechten Seite des Plots. Dies wird auch die Skweness `r psych::skew(UN_new$ppgdp)` bestätigt. Im Histogramm zeigt sich, dass die Daten zwar sehr weit verteilt sind, jedoch ab etwa 60.000 US-Dollar gegen Null tendieren. Weiterhin weichen der arithmetische Mittelwert (`r mean(UN_new$ppgdp)`) und der Median (`r median(UN_new$ppgdp)`) deutlich voneinander ab, was die Grafiken ebenfalls nochmalig unterstreichen.
+
+Diese Schiefe wird im Boxplot ebenfalls nochmal sehr gut sichtbar. Anzumerken ist hierbei, dass Boxplots für normalverteilte optimal sind. Die hier dargestellten Ausreißer, müssen demnach keine Ausreißer sein sondern werden als solche dargsetellt, da diese aufgrund der Schiefe außerhalb des Quantiles des Boxplots liegen.
+
+Zusammenfassend zeigt sich jedoch die Unimodalität und rechtsscheife der Daten.
+
+## Korrelations- und Lineritätscheck zwischen der Infant Mortality sowie dem Gross Domestic Product
+### Originaldaten
+
+Zuerst schauen wir uns einen Scatterplot der Originaldaten an.
+
+```{r CorInfantGDP_plot , echo=FALSE, message=FALSE, fig.height=3.5}
+
+plot(x=UN_new$infantMortality, y=UN_new$ppgdp, xlab = "Infant Mortality [per 1000]", ylab = "Gross Domestic Product [US Dollar]", main = "Scatterplot der Originaldaten")
+
+```
+Wir sehen an der Stelle, dass diese Daten eine Kurve beschreiben und es hier wenig Sinn macht eine Regressionsgerade durchzulegen. Allerdings liegen die Daten so, dass man eventuell durch logarithmieren eine gerichtete Punktewolke hinbekommt, womit eine Korrelation wieder deutlich mehr Sinn machen würde.
+
+### Logarithmierte Daten
+
+```{r CorInfantGDP_plot_log, echo=FALSE, message=FALSE, fig.height=3.5}
+
+plot(x=log(UN_new$infantMortality), y=log(UN_new$ppgdp), xlab = "Log Infant Mortality [per 1000]", ylab = "Log Gross Domestic Product [US Dollar]", main = "Scatterplot der logarithmierten Daten")
+
+```
+Hier lässt sich bereits eine negativ gerichtete Gerade erahnen. Eine negative Korrelation würde hier bedeuten, dass ein linearer Zusammenhang beobachtet werden kann. So scheint es - aufgrund dieser Daten - einen Zusammenhang zwischen einer niedrigen Säuglingssterblichkeit bei hohem Bruttoinlandsprodukt oder umgekehrt einer hohen Säuglingssterblichkeit bei einem niedrigen Bruttoinlandsprodukt zu geben. Dies wird nun mit der Pearson-Korrelation getestet.
+
+```{r CorInfantGDP, include=TRUE, echo=FALSE, message=FALSE , warning=FALSE, comment=">"}
+cor.test(log(UN_new$infantMortality), log(UN_new$ppgdp))
+pear_log_Infant_gdp <- cor.test(log(UN_new$infantMortality), log(UN_new$ppgdp))
+```
+Die Pearson-Korrelation zeigt einen Wert von `r pear_log_Infant_gdp$estimate`. Dies bestätigt obige Annahme eines Zusammenhangs zwischen niedriger Säuglingssterblichkeit bei hohem Bruttoinlandsprodukt.
+
+Auch der p-value mit < 2.2e-16 zeigt, dass H0 (keine Korrelation) verworfen werden kann. 
+
+Für die Modellanpassung werden die logarithmierten Daten verwendet. 
+
+### Modellanpassung mit logarithmierten Daten
+
+```{r, include=TRUE, comment=">"}
+log.lm <- lm(log(UN_new$infantMortality)~log(UN_new$ppgdp))
+summary(log.lm)
+```
+Für hier gilt:
+
+* H0: kein linearer Zusammenhang
+* H1: linearer Zusammenhang
+
+Die F-Statistik (625.9) und der p-value von < 2.2e-16 lässt uns die H0 verwerfen. Durch den Adjusted R-squared von 0.765 kann ausgesagt werden, dass von den abhängigen Variablen ca. 76% der Varianz durch das dieses lineare Modell erklärt werden können. Der Standardfehler der Residuen beträt 0.5281 bei 191 Freiheitsgraden.
+
+### Überprüfung der Residuen 
+
+```{r }
+par(mfrow = c(2, 2))
+plot(log.lm)
+```
+
+* **Residuals vs Fitted:** Die Residuen sind homoskedastisch. Sie sind auch um den 0-Wert zentriert, was auf keinen systematischen Fehler hinweist. Zudem sind die Residuen nicht korreliert und beeinflussen sich nicht gegenseitig.
+* **Normal Q-Q:** Die Residuen liegen zum allergrößten Teil auf der Linie und heben sich nur am Rechten Rand etwas ab (schwerer Rand). Die Residuen wirken daher normalverteilt. Es gibt zwar auf der rechten Seite zusätzlich noch einen Ausreißer (54) - jedoch sollte dieser bei diesem Datenumfang kein Problem darstellen.
+* **Scale-Location:** Es sind keine Verläufe erkennbar und die Residuals wirken nicht heteroskedastisch. 
+* **Residuals vs Leverage:** Die Punkte liegen innerhalb der Cook's distance, wodurch sich kein starker (negativer) Hebeleffekt erkennen lässt. Zwar ist ganz rechts ein Punkt zu sehen, dieser liegt allerdings nur knapp neben der Linie und hätte daher eher einen positiven Hebeleffekt (im Gegensatz zu solchen Residuals, welche außerhalb der Cooks-Distance liegen würden).
+
+### Erstellung der Modell-Gleichung
+
+* **Allgemeine Regressionsgleichung:** 
+
+$$y(i) = alpha + beta *x$$
+
+* **Modell-Gleichung:** 
+
+$$log(infantMortality) = 8.10377 - 0.61680 \cdot log(ppgdp)$$
+* **Dabei gilt:** Die 8.10377 ist das Intercept und die -0.61680 ist die Steigung.
+
+### Scatterplot mit Regressionsgeraden
+
+```{r , echo=FALSE}
+plot(log(UN_new$ppgdp), log(UN_new$infantMortality), main="Scatterplot der log Daten mit Modell-Linie", ylab = "Log Infant Mortality [per 1000]", xlab = "Log Gross Domestic Product [US Dollar]" ) 
+abline(log.lm, col = "red", lwd = 2)
+```
+
+### Umkehrung der linearen Transformation
+
+Um wieder zu den Originaldaten zurückzugelangen, muss das durch Logarithmierung erstellte Modell wieder umgeformt werden. 
+
+**Hierfür gilt:**
+
+$$exp(log(infantMortality))= exp(-0.61680 * log(ppgdp) + 8.10377)$$
+
+$$infantMortality = ppgdp^{-0.61680}*exp(8.10377)$$
+
+**Die Funktion für das Modell der Original-Daten lautet somit:**
+
+$$ppgdp = 3306.912 \cdot (infantMortality)^{-0.61680}$$
+
+Durch betrachten der Gleichung wird ersichtlich, dass wenn die Säuglingssterblichkeit (x-Achse) auf Null gehen würde, wäre das Bruttoinlandsprodukt (y-Achse) unendlich gross. Zudem bedeutet eine Erhöhung der Säuglingssterblichkeitsrate um 1, dass das Bruttoinlandsprodukt um das 3306.912 fache sinkt.
+
+```{r, echo=FALSE}
+plot(UN_new$ppgdp, UN_new$infantMortality,ylab = "Infant Mortality [per 1000]", xlab = "Gross Domestic Product [US Dollar]", main = "Scatterplot der Originaldaten mit Modell_Linie")
+curve (exp(log.lm$coefficients[2]*log(x) + log.lm$coefficients[1]), add=TRUE, col = "red", lwd = 2)
+```
+\pagebreak
+
+# Aufgabe 2: Schweiz
+
+* Wir kehren zurück zu den Variablen “Fertility”, “Agriculture”, “Education”, “Catholic” und “Infant. Mortality”
+aus dem R Datensatz swiss des R package utils. 
+* Passen Sie für die oben genannten Variablen ein Modell an, das Education durch die übrigen Variablen erklärt, soweit dies zulässig ist.
+
+```{r}
+library(utils)
+str(swiss)
+plot(swiss)
+```
+In dieser Aufgabenstellung geht es darum, das optimale lineare Modell zu finden um die Variable Education durch die übrigen Variablen zu beschreiben. Hierfür müssen allerdings zuerst die statistischen Voraussetzungen hierfür überprüft bzw. evaluiert werden.
+
+## Überprüfung der statistischen Voraussetzungen
+
+### Zusammenfassung und Residuenplots
+
+``` {r echo=FALSE, comment=">", fig.height= 4, warning=FALSE}
+cor(swiss)
+
+panel.hist <- function(x, ...)
+{
+usr <- par("usr"); on.exit(par(usr))
+par(usr = c(usr[1:2], 0, 1.5) )
+h <- hist(x, plot = FALSE)
+breaks <- h$breaks; nB <- length(breaks)
+y <- h$counts; y <- y/max(y)
+rect(breaks[-nB], 0, breaks[-1], y, col = "cyan", ...)
+}
+
+panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
+{
+usr <- par("usr"); on.exit(par(usr))
+par(usr = c(0, 1, 0, 1))
+r <- abs(cor(x, y))
+txt <- format(c(r, 0.123456789), digits = digits)[1]
+txt <- paste0(prefix, txt)
+if(missing(cex.cor)) cex.cor <- 0.8/strwidth(txt)
+text(0.5, 0.5, txt, cex = cex.cor * r)
+}
+
+pairs(swiss, lower.panel = panel.smooth, upper.panel = panel.cor, diag.panel = panel.hist,las=1)
+```
+
+Aus dem Scatterplot sehen wir, dass die Variable Examination mit fast allen anderen Variablen hoch korreliert. Da dies für eine Modellbildung als erklärende Variable nicht zulässig ist, wird diese aus dem Datensatz entfernt und die Daten via Scatterplot nochmalig geprüft.
+
+``` {r echo=FALSE, comment=">", fig.height= 4, warning=FALSE}
+data <- swiss %>% select(-Examination)
+
+panel.hist <- function(x, ...)
+{
+usr <- par("usr"); on.exit(par(usr))
+par(usr = c(usr[1:2], 0, 1.5) )
+h <- hist(x, plot = FALSE)
+breaks <- h$breaks; nB <- length(breaks)
+y <- h$counts; y <- y/max(y)
+rect(breaks[-nB], 0, breaks[-1], y, col = "cyan", ...)
+}
+
+panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
+{
+usr <- par("usr"); on.exit(par(usr))
+par(usr = c(0, 1, 0, 1))
+r <- abs(cor(x, y))
+txt <- format(c(r, 0.123456789), digits = digits)[1]
+txt <- paste0(prefix, txt)
+if(missing(cex.cor)) cex.cor <- 0.8/strwidth(txt)
+text(0.5, 0.5, txt, cex = cex.cor * r)
+}
+
+pairs(data, lower.panel = panel.smooth, upper.panel = panel.cor, diag.panel = panel.hist,las=1)
+```
+Zwischen den erklärenden Variablen (ausgenommen Education, welche erklärt werden soll) ist nun keine Korrelation mehr erkennbar. Daher kann nun mit diesem Datensatz weitergearbeitet werden.
+
+``` {r echo=TRUE, comment=">", fig.height= 4}
+modell <- lm(Education ~ ., data)
+summary(modell)
+plot(modell)
+explanatory<-data %>% select(-Education)
+plot(explanatory)
+cor(explanatory)
+```
+### Interpretation der weiteren Plots
+
+Mithilfe der oben angeführten Plots (ausgenommen der ersten beiden Scatterplots) werden nun die Anforderungen für eine multiple lineare Regression geprüft. 
+Aus dem Skript lassen sich folgende Annahmen und Voraussetzungen für eine multiple Regression ableiten:
+* Das Modell besitzt keinen systematischen Fehler
+* Die Fehlervarianz ist für alle Beobachtungen gleich groß (homoskedastisch)
+* Die Komponenten des FEhlerterms sind nicht korreliert
+* Der Modellfehler sei normalverteilt
+* Es gibt keine lineare Abhängigkeit zwischen den Regressoren
+
+Aufgrund des Medians (-0.7571), welcher in der Nähe der 'Nulllinie' liegt, kann man schließen, dass die Residuen um Null herum zentriert sind. Diese Bedingung ist daher erfüllt.
+Am Residual vs. Fitted sowie am Scale-Location Plot ist zu sehen dass die Residuen sowohl unkorreliert als auch homoskedastisch sind.  
+In der Scatterplot-Matrix ist visuell keine Korrelation zwischen erklärenden Variablen erkennbar. Auch die Korrelationskoeffizienten betragen alle unter 0.5. Daher sind alle Bedingungen für eine multiple lineare Regression erfüllt. 
+
+Im Residuals vs. Leverage Plot fallen jedoch diverse Dinge auf. So existiert ein Punkt ziemlich am Ende mit einer hohen Hebelwirkung, welche allerdings nicht negativ ist. Die Punkte Sierre und Porrentuy liegen etwas symmetrisch und innerhalb der Hooks-Distance und müssen daher auch nicht entfernt werden. Kritisch ist allerdings der Punkt V. De Geneve, welcher außerhalb der Hooks-Distance liegt, daher eine große (negative) Hebelwirkung zeigt und daher in Folge entfernt werden sollte nach bisherigem Kenntnissstand.
+
+Eine weitere Bedingung, welche insbesondere für das Testen der Parameter benötigt wird, weniger jedoch für die lineare Regression selbst, ist die Normalverteilung der Daten. Diese kann über den Q-Q Plot evaluiert werden. In dieser ist zu erkennen, dass es ein paar Punkte gibt, welche sich von der Geraden wegbewegen in Form eines schweren Randes. Dies betrifft nur wenige Punkte, wobei einer davon sowieso entfernt wird aufgrund der Hooks-Distance. Die Daten sind daher nicht komplett normalverteilt, allerdings sind es nur sehr wenige Werte die von der Norm abweichen. Man kann daher von einer ausreichenden Normalverteilung der Daten ausgehen.
+
+## Erstellen des Modells
+
+Wir erstellen daher nun ein Modell, welches den Punkt "V. De Geneve" nicht mehr enthält und schauen, wie gut unser Modell funktioniert. 
+
+**Modell #1: Punkt "V. De Geneve" entfernt, alle Spalten bis auf Examination enthalten**
+``` {r echo=TRUE, comment=">", fig.height= 4}
+data <- swiss %>% select(-Examination)
+neudata=rbind(data[1:44,],data[46:47,])
+neumodell <- lm(Education ~ ., neudata)
+summary(neumodell)
+```
+Wir stellen hier zum einen fest, dass unser Modell nur relativ unzureichend ist mit einem Multiple R-squared:  0.6299 sowie Adjusted R-squared:  0.5938. Weiters stellen wir fest, dass die Spalte "Infant.Mortality" zum Modell nichts beiträgt (p=0.34170), und daher in Folge entfernt wird. 
+
+**Modell #2: Punkt "V. De Geneve" entfernt, alle Spalten bis auf Examination und Infant Mortality enthalten**
+
+``` {r echo=TRUE, comment=">", fig.height= 4}
+data2 <- swiss %>% select(-Examination, -Infant.Mortality)
+neudata2=rbind(data2[1:44,],data2[46:47,])
+neumodell2 <- lm(Education ~ ., neudata2)
+summary(neumodell2)
+```
+Interessanterweise wurde unser Modell etwas schlechter (Multiple R-squared:  0.6216,	Adjusted R-squared:  0.5945; wobei wir uns erstmal auf den R2-Wert beziehen), obwohl wir die Spalte Infant Mortality entfernt hatten. Dies erscheint uns etwas paradox, da wir uns eigentlich ein deutlich besser angepasstes Modell erwartet hatten. Unsere Überlegung ist daher, den Hebelpunkt "V. De Geneve" doch in unseren Daten zu lassen in der Hoffnung auf ein besser angepasstes Ergebnis. Dies wird nun getestet.
+
+**Modell #3: Punkt "V. De Geneve" behalten, alle Spalten bis auf Examination und Infant Mortality enthalten**
+
+``` {r echo=TRUE, comment=">", fig.height= 4}
+data2 <- swiss %>% select(-Examination, -Infant.Mortality)
+neumodell3 <- lm(Education ~ ., data2)
+summary(neumodell3)
+```
+Aus den R2 sowie den R2-adjusted Werten ist zu erkennen, dass es sich bei dem Modell ohne der Variable "Infant Mortality" sowie inklusive dem Wert "V. De Geneve" um das Beste Modell handelt, welches wir erstellt hatten. 
+
+Wir zeigen nun daher die Formel für das Regressionsmodell.
+
+### Regressionsmodell
+
+Das daraus reslultierende Regressionsmodell lautet: 
+$$Education_i = \alpha + \beta_{Fertility} \times x_{Fertility,i} + \beta_{Agriculture} \times x_{Agriculture,i} + \beta_{Catholic} \times x_{Catholic,i} + \varepsilon_i$$
+
+### Modellgleichung
+
+Die angepasste Modellgleichung ist: 
+$$Education_i = 53.8505 + -0.48883 \times x_{Fertility,i} + -0.23799 \times x_{Agriculture,i} + 0.08440 \times x_{Catholic,i}$$
+
+## Interpretation der Koeffizienten
+
+Der intercept alpha bedeutet, dass 45.2686% der Bevölkerung eine Ausbildung höher als die der Grundschule hätte wenn... 
+* die Bevölkerung komplett unfruchtbar wäre
+* kein Mann mehr in der Landwirtschaft tätig wäre 
+und 
+* niemand katholisch wäre.  
+
+Die einzelnen Beta-Koeffizienten stellen dar wie stark (prozentual) die Bevölkerung mit einer Ausbildung höher als die der Grundschule steigen würde, vorausgesetzt das dazugehörige Maß steigt um 1% während die anderen gleich bleiben.
+
+Das bedeutet für 1% mehr in der "common standardized fertility measure" sind es 0.48883% weniger, für 1% mehr Männer in der Landwirtschaft 0.23799% weniger und für 1% mehr Katholiken sind es 0.08440% mehr Menschen mit einer höheren Ausbildung als Grundschulausbldung. 
+
+\pagebreak
+
+# Aufgabe 3: USA
+
+* Wir kehren zurück zu den Variablen “Population”, “Income”, “Illiteracy”, “Life.Exp”, “Murder”, “HS Grade”
+und “Frost” aus dem R Datensatz state.x77. 
+* Passen Sie für die oben genannten Variablen ein lineares Modell (lm) an, das “Murder” durch die übrigen Variablen erklärt, soweit dies zulässig ist.
+
+```{r}
+glimpse(state.x77)
+class(state.x77)
+```
+**Beschreibung des Datensatzes:** 
+* **Population:** Bevölkerungsanzahl am 01. Juli 1975 (Original [en]: population estimate as of July 1, 1975)
+* **Income:** Einkommen pro Kopf (Stand: 1974) (Original [en]: per capita income (1974))
+* **Illiteracy:** Analphabetismus (Stand: 1970; % der Bevölkerung) (Original [en]: illiteracy (1970, percent of population))
+* **Life Exp:** Lebenserwartung in Jahren (Original [en]: ife expectancy in years (1969–71))
+* **Murder:** Anzahl an Mördern und nicht fahrlässige Tötungen je 100.000 Einwohnern (Original [en]: murder and non-negligent manslaughter rate per 100,000 population (1976))
+* **HS Grad:** Highschool Abschlüsse in Prozent (Original [en]: percent high-school graduates (1970))
+* **Frost:** Durchschnittstage mit Frost (Temperaturen unterhalb des Gefrierpunktes) in den Haupt- oder Großstädten (Original [en]: mean number of days with minimum temperature below freezing (1931–1960) in capital or large city)
+* **Area:** Fläche der Region in Quadratmeilen (Original [en]: land area in square miles)
+
+## Scatterplots
+
+Zunächst wurden Scatterplots erstellt, um einen Überblick darüber zu erhalten welche Variablen mit "Murder" in einem linearen zusammenhang zu stehen scheinen.
+
+```{r}
+rm(data)
+data<-as.data.frame(state.x77) %>%
+  rename(Life_Exp = "Life Exp",
+         HS_Grad = "HS Grad")
+```
+
+``` {r echo=FALSE, comment=">", fig.height= 4, warning=FALSE}
+panel.hist <- function(x, ...)
+{
+usr <- par("usr"); on.exit(par(usr))
+par(usr = c(usr[1:2], 0, 1.5) )
+h <- hist(x, plot = FALSE)
+breaks <- h$breaks; nB <- length(breaks)
+y <- h$counts; y <- y/max(y)
+rect(breaks[-nB], 0, breaks[-1], y, col = "cyan", ...)
+}
+
+panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
+{
+usr <- par("usr"); on.exit(par(usr))
+par(usr = c(0, 1, 0, 1))
+r <- abs(cor(x, y))
+txt <- format(c(r, 0.123456789), digits = digits)[1]
+txt <- paste0(prefix, txt)
+if(missing(cex.cor)) cex.cor <- 0.8/strwidth(txt)
+text(0.5, 0.5, txt, cex = cex.cor * r)
+}
+
+pairs(data, lower.panel = panel.smooth, upper.panel = panel.cor, diag.panel = panel.hist,las=1)
+```
+Da wir sehen, dass die Variable "HS_Grad" mit nahezu allen anderen Variablen sehr gut korreliert, ist diese als erklärende Variable auszuschließen. Gleiches gilt für Illiteracy.
+
+``` {r echo=FALSE, comment=">", fig.height= 4, warning=FALSE}
+data2 <- data %>% select(-HS_Grad, -Illiteracy)
+
+panel.hist <- function(x, ...)
+{
+usr <- par("usr"); on.exit(par(usr))
+par(usr = c(usr[1:2], 0, 1.5) )
+h <- hist(x, plot = FALSE)
+breaks <- h$breaks; nB <- length(breaks)
+y <- h$counts; y <- y/max(y)
+rect(breaks[-nB], 0, breaks[-1], y, col = "cyan", ...)
+}
+
+panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
+{
+usr <- par("usr"); on.exit(par(usr))
+par(usr = c(0, 1, 0, 1))
+r <- abs(cor(x, y))
+txt <- format(c(r, 0.123456789), digits = digits)[1]
+txt <- paste0(prefix, txt)
+if(missing(cex.cor)) cex.cor <- 0.8/strwidth(txt)
+text(0.5, 0.5, txt, cex = cex.cor * r)
+}
+
+pairs(data2, lower.panel = panel.smooth, upper.panel = panel.cor, diag.panel = panel.hist,las=1)
+```
+Nun sind nurmehr Variablen übrig, welche als erklärende Variablen nicht hoch miteinander korrelieren.
+
+## Überprüfung der statistischen Voraussetzungen
+
+### Summary und Residuenplots
+
+``` {r echo=FALSE, comment=">", fig.height= 4}
+modell <- lm(Murder ~ ., data2)
+summary(modell)
+plot(modell)
+# explanatory<-cbind(data[,1:2],data[,4:5])
+# plot(explanatory)
+# cor(explanatory)
+```
+In unserem ersten erstellen Modell sehen wir, dass dass nicht alle Variablen zur Erklärung herangezogen werden können. Income spielt keine Rolle mit einem P-Value von 0.530396. Die Region spielt hier auch nur eine untergeordnete Rolle im Vergleich zu den anderen Variablen, kann aber durchaus als erklärende Variable hinzugezogen werden.
+
+Im Plot **Residuals vs. Fitted** haben wir eine gleichmäßig verteilte Punktewolke, welche keinen systematischen Fehler aufweist und auch keine Korrelationen erkennen lassen. Die Bedingung wäre daher erfüllt.
+
+Im Plot **Residuals vs. Leverage** sehen wir eine Beobachtung "Alaska", welche exakt auf der Cooks Distance liegt und daher eine große Hebelwirkung erzielt. Diese ist daher zu entfernen. Es existieren noch zwei weitere Beobachtungen "Nevada" und "Hawaii", welche eine relativ große Hebelwirkung aufweisen und sehr Nahe der Cooks Distance liegen - wir aber noch nicht entfernen müssen, da sie nach wie vor innerhalb dieses Bereiches liegen.
+
+Beim Plot **Scale Location** sehen wir eine leichte Drehung der Daten, vermutlich verursacht durch die Variablen Hawaii, Maine und Nevada. Jedoch scheint der Plot noch in Ordnung zu sein. 
+
+Die **Q-Q Residuals** zeigen nahezu normalverteilte Daten, welche für unsere Regression ausreichen sein sollte.
+
+Im Folgenden Schritt entfernen wir nun die Variable Income als nicht ausreichend erklärende Variable sowie die Beobachtung "Alaska".
+
+```{r}
+data3 <- data2 %>% select(-Income)
+data3 <- data3[-2,]
+```
+
+Im folgenden schauen wir uns das Modell nochmal an:
+
+```{r}
+modell_new <- lm(Murder ~ ., data3)
+summary(modell_new)
+plot(modell_new)
+
+data4 <- data3 %>% select(-Murder)
+cor(data4)
+```
+Unser neues Modell zeigt nun nur mehr statistisch erklärende Daten, wobei Area (p-Value von 0.029819) und Population (p-Value von 0.023509) im Vergleich einen deutlich geringeren Einfluss haben. 
+Der Median (0.0295) zeigt außerdem, dass die Daten nahe der Null-Linie verteilt sind und das Modell daher gültig sein sollte. Ebenso zeigen die ausgerechneten Korrelationen der erklärenden Variablen keine Zusammenhänge / Korrelationen zueinander (< 0.5).
+
+### Regressionsmodell
+
+Das daraus reslultierende Regressionsmodell lautet: 
+$$Murder_i = \alpha + \beta_{Population} \times x_{Population,i} + \beta_{Life_Exp} \times x_{Life_Exp,i} + \beta_{Frost} \times x_{Frost,i} + \beta_{Area} \times x_{Area,i} + \varepsilon_i$$
+### Modellgleichung
+
+Die angepasste Modellgleichung ist: 
+$$Murder_i = 1.414e+02 + 1.430e-04 \times x_{Population,i} + -1.879e+00 \times x_{Life_Exp,i} + -2.135e-02 \times x_{Frost,i} + 1.246e-05 \times x_{Area,i}$$
+
+\pagebreak
+
+# Aufgabe 4: Lake Huron
+
+* Wir kehren zurück zum Datensatz “LakeHuron”. 
+* Passen Sie ein Modell an, das den Zeittrend modelliert.
+* Überprüfen Sie alle erforderlichen statistischen Voraussetzungen für die Gültigkeit dieses Modells mtihilfe der quality plots der Residuen.
+
+**Beschreibung des Datensatzes:** Jährliche Messungen des Pegels des Huron-Sees in Fuß, 1875-1972.
+
+## Erste Untersuchung der Daten
+```{r data, include=FALSE}
+
+data(LakeHuron)
+lh <- LakeHuron
+LH <- data.frame(Date = 1875:1972, 
+                 Depth  = LakeHuron,
+                 sd = runif(length(LakeHuron),0,1))
+
+LH$Date <- as.numeric(LH$Date)
+LH$Depth <- as.numeric(LH$Depth)
+LH$sd <- as.numeric(LH$sd)
+
+class(LH$Date)
+class(LH$Depth)
+class(LH$sd)
+
+model_lh <- lm(lh~time(lh))
+
+```
+
+```{r plot01, echo=FALSE}
+plot(lh, main="Lake Huron Wasserstand", xlab= "Date [year]", ylab="Depth [feet]")
+```
+
+```{r values, echo=FALSE, tidy=TRUE, comment=""}
+
+cat("Mean:             ", format(round(mean(lh), 2), nsmall = 2), "\n")      # Durchschnitt
+cat("Median:           ", format(round(median(lh), 2), nsmall = 2), "\n")    # Median
+cat("Min:              ", format(round(min(lh), 2), nsmall = 2), "\n")       # Minimaler Wert
+cat("Max:              ", format(round(max(lh), 2), nsmall = 2), "\n")       # Maximaler Wert
+cat("Variance:         ", format(round(var(lh), 2), nsmall = 2), "\n")       # Varianz
+cat("Standardeviation: ", format(round(sd(lh), 2), nsmall = 2), "\n")        # Standardabweichung
+
+```
+
+## Modellanpassung
+
+```{r, echo=FALSE, comment=">"}
+par(mfrow=c(2,2))
+plot(model_lh)
+```
+
+Anhand der Modelanpassung können folgende Aussagen getroffen werden:
+
+* Im Plot *_**Residuals vs Fitted:** Die Residuen schwanken relativ gleichmäßig um Null und die angepasste Rote Linie ist leicht gebogen, **was einen systematischen Fehler hindeutet bzw. eben korrelierte Daten**. Damit ist eine **Voraussetzung für eine multiple Regression nicht mehr gegeben**, weshalb die Analyse an dieser Stelle abgebrochen wird. Die Alternative wäre hier, das Regressionsmodell zu erstellen und anschließend zu sagen, dass dieses Modell aufgrund vorher genannten systematischen Fehlers nicht gültig wäre. 
+* Im Plot ***Scale-Location:** Die Standardabweichung der Residuen scheinen relativ konstant und es kann von einer Homoskedastizität ausgegangen werden.
+* Im Plot **Normal Q-Q:** Die Punkte liegen großteils auf beziehungsweise sehr nah an der Referenzlinie, weshalb man von einer Normalverteilung ausgehen kann.
+* Im Plot **Residuals vs Leverage:** Da alle Werte innerhalb der Cook’s Distance liegen kann kein Hebelpunkt indentifiziert werden. Denoch ist auch hier noch der Kurvenverlauf wie in Residuals vs Fitted in Teilen zu erkennen.
+
+\pagebreak
+
+# Aufgabe 5: Pima Indians
+
+* Laden Sie den Datensatz ‘Pima.tr’ aus der library ‘MASS’. 
+* Ermittle ein logistisches Regressionsmodell, dass das Auftreten von Diabetes (‘type’) durch die übrigen unabhängigen Variablen Alter (age), Anzahl der Schwangerschaften (npreg), BMI, Glukosespiegel (glu), Blutdruck (bp), familiäre Häufung von Diabetesfällen (ped) und Hautfaltendickemessung am Oberarm (skin) erklärt. 
+* Schreibe die Modellgleichung an und interpretiere die Werte der Koeffizienten im Kontext.
+* Ermitteln Sie die prädiktive Qualität des Modells mithilfe einer Receiver Operating Characteristic (ROC) Kurve. 
+* Führen Sie auch die False Positive, False Negative, True Positive und True Negative Raten in einer Tabelle (Konfusionsmatrix) an.
+
+**Beschreibung des Datensatzes:** Eine Population von Frauen, die mindestens 21 Jahre alt waren, von den Pima-Indianern abstammten und in der Nähe von Phoenix, Arizona, lebten, wurde nach den Kriterien der Weltgesundheitsorganisation auf Diabetes getestet. Die Daten wurden vom US National Institute of Diabetes and Digestive and Kidney Diseases erhoben. Wir haben die 532 vollständigen Datensätze verwendet, nachdem wir die (größtenteils fehlenden) Daten zum Seruminsulin herausgenommen haben.
+
+* **npreg:** Anzahl der Schwangerschaften (Original [en]: number of pregnancies.)
+* **glu:** Plasmaglukosekonzentration bei einem oralen Glukosetoleranztest. (Original [en]: plasma glucose concentration in an oral glucose tolerance test.)
+* **bp:** diastolischer Blutdruck (mm Hg). (Original [en]: diastolic blood pressure (mm Hg).)
+* **skin:** Dicke der Trizepshautfalte (mm). (Original [en]: triceps skin fold thickness (mm).)
+* **bmi:** BMI (Original [en]: body mass index (weight in kg/(height in m)
+* **ped:** Diabetes-Stammbaumfunktion. (Original [en]: diabetes pedigree function.)
+* **age:** Alter in Jahren (Original [en]: age in years.)
+* **type:** Diabetis ja/nein (Original [en]: Yes or No, for diabetic according to WHO criteria.)
+
+```{r , message=FALSE}
+library(MASS)
+library(corrplot)
+library(pROC)
+head(Pima.tr)
+str(data)
+PrimaOriginal <- Pima.tr
+```
+
+Wir haben hier prinzipiell die Situation, dass die Variable type nominal-skaliert ist mit zwei Ausprägungen "ja" und "nein". Wir können weiters hier von einer Binominalverteilung ausgehen, da es nur zwei Ergebnisse gibt diesbezüglich. Als Folge wäre hier eine logistische Regression anzuwenden.
+
+``` {r echo=FALSE, comment=">", fig.height= 4, warning=FALSE}
+pairs(PrimaOriginal, lower.panel = panel.smooth, upper.panel = panel.cor, diag.panel = panel.hist,las=1)
+```
+
+
+```{r}
+Prima_test <- PrimaOriginal
+Prima_test$type <- NULL
+cor(Prima_test) %>% corrplot()
+cor(Prima_test)
+```
+
+Wir sehen, dass hier BMI und skin miteinander korrelieren sowie npreg und age. Da der Datensatz recht groß ist, haben wir uns dazu entschieden erstmal zu schauen, ob diese Koeffizienten überhaupt etwas zum Modell beitragen und erstmal ein generalisiertes lineares Modell zu erstellen.
+
+## Modell 1 - alle Koeffizienten vorhanden
+```{r}
+(modell_glm <- glm(type~.,data=PrimaOriginal,family=binomial(link = "logit")))
+summary(modell_glm)
+```
+Wie wir in obigem Modell sehen, tragen die Koeffizienten npreg, bp und skin ohnehin nichts zum Modell bei und werden daher entfernt. Damit erübrigen sich auch die Korrelationen der ersten explorativen Analyse.
+
+## Modell 2 - Koeffizienten npreg, bp und skin entfernt.
+
+```{r}
+Prima_filtered <- PrimaOriginal
+Prima_filtered$npreg <- NULL
+Prima_filtered$bp <- NULL
+Prima_filtered$skin <- NULL
+
+(modell_glm2 <- glm(type~.,data=Prima_filtered,family=binomial(link = "logit")))
+summary(modell_glm2)
+```
+Wir sehen, dass hier nur noch Koeffizienten dabei sind, welche zum Modell etwas beitragen. Hinzu kommt, dass sich die p-Values der Koeffizienten age und bmi deutlich 'gebessert' haben bzw. niedriger sind.
+
+## ROC Kurve
+
+Wir machen hier zu beiden Modellen eine ROC-Kurve um die prädiktive Qualität des Modells zu beurteilen.
+
+### Modell 1 - alle Koeffizienten vorhanden
+
+```{r}
+predictions <- predict(modell_glm, PrimaOriginal, type="response")
+roc_curve <- roc(Pima.tr$type, predictions)
+plot(roc_curve,main ="ROC Kurve -- Logistische Regression ")
+as.numeric(roc_curve$auc)
+```
+Wir sehen hier mit einem ROC-Wert von 0.8502674 ein relativ gut angepasstes Modell. 
+
+## Modell 2 - Koeffizienten npreg, bp und skin entfernt.
+
+```{r}
+modell_glm2 <- glm(type~.,data=Prima_filtered,family=binomial(link = "logit"))
+predictions_filtered <- predict(modell_glm2, Prima_filtered, type="response")
+roc_curve_filtered <- roc(Prima_filtered$type, predictions_filtered)
+plot(roc_curve_filtered,main ="ROC 'Kurve' -- Logistische Regression ")
+as.numeric(roc_curve_filtered$auc)
+```
+
+Für Modell 2 ergibt sich ein ROC-Wert von 0.846, somit hat die Entfernung der Koeffizient npreg, bp und skin, die Qualität des Modells nicht signifikant beeinflusst.    
+
+## Modellgleichung 
+
+### Modell 1 - alle Koeffizienten vorhanden
+
+Die Grundgleichung lautet wie folgt
+
+$$logit_(type_i) = \alpha + \beta_{npreg} \times x_{npreg,i} + \beta_{glu} \times x_{glu,i} +  \beta_{bp} \times x_{bp,i} + \beta_{skin} \times x_{skin,i} +$$
+$$\beta_{bmi} \times x_{bmi,i} + \beta_{ped} \times x_{ped,i} + \beta_{age} \times x_{age,i}  + \varepsilon_i$$
+Das Modell im Detail daher:
+
+
+$$logit_(type_i) = -9.773061533 + 0.103183427 \times x_{npreg,i} + 0.032116823 \times x_{glu,i} + $$
+$$-0.004767542 \times x_{bp,i} + -0.001916632 \times x_{skin,i} + 0.083623912 \times x_{bmi,i}$$
+$$+ 1.820410367 \times x_{ped,i} + 0.041183529 \times x_{age,i}  + \varepsilon_i$$
+
+### Modell 2 - nicht beitragende Koeffizienten verworfen
+
+```{r}
+modell_glm2$coefficients
+```
+Die Grundgleichung lautet wie folgt
+
+$$logit_(type_i) = \alpha + \beta_{glu} \times x_{glu,i} + \beta_{bmi} \times x_{bmi,i} + \beta_{ped} \times x_{ped,i} + \beta_{age} \times x_{age,i}  + \varepsilon_i$$
+
+Das Modell daher:
+
+$$logit_(type_i) = -10.01125925 + 0.03143671 \times x_{glu,i} + 0.07726048 \times x_{bmi,i} + 1.72763912 \times x_{ped,i} + 0.05891378 \times x_{age,i}  + \varepsilon_i$$
+
+## Erstellung der Confusion-Matrix
+
+```{r}
+PrimaOriginal$truefalse <- ifelse(predict(modell_glm2, type = "response") > 0.5, "Yes", "No")
+view(PrimaOriginal)
+```
+
+```{r}
+Prima_filtered$truefalse <- ifelse(predict(modell_glm2, type = "response") > 0.5, "Yes", "No")
+```
+
+```{r, eval=FALSE, echo=TRUE, message=FALSE} 
+model1 = table(predicted = PrimaOriginal$truefalse, actual = PrimaOriginal$type)
+library(caret)
+model1_con_mat = confusionMatrix(model1, positive = "Yes")
+c(model1_con_mat$overall["Accuracy"], 
+  model1_con_mat$byClass["Sensitivity"], 
+  model1_con_mat$byClass["Specificity"])
+model1_con_mat
+```
+
+```{r message=FALSE} 
+library(caret)
+model2 = table(predicted = Prima_filtered$truefalse, actual = Prima_filtered$type)
+model2_con_mat = confusionMatrix(model2, positive = "Yes")
+c(model2_con_mat$overall["Accuracy"], 
+  model2_con_mat$byClass["Sensitivity"], 
+  model2_con_mat$byClass["Specificity"])
+model2_con_mat
+```
+Nach dem Vergleich beider Konfusion-Matrizen stellen wir fest, dass es keinen Unterschied in der Accuracy, Sensitivity sowie Specificity gibt. 
+Aufgrund der geringeren Komplexität des zweiten generalisierten linearen Modells (weniger Koeffizienten) entscheiden wir uns für dieses.
+
+Bei der Konfusionsmatrix handelt es sich um ein binäres Zweiklassenmodell, welches die Verteilung der vorhergesagten und tatsächlichen Werte widerspiegelt.
+
+In diesem Fall:
+
+True Positives: 38
+True Negatives: 116
+False Positives: 16
+False Negatives: 30
+
+Die Genauigkeit umschreibt die insgesamt richtig klassifizierten Werte im Verhältnis zu allen klassifzierten. In unserem sind das 154 korrekt vorhergesasgte Werte von 200, was einer Genauigkeit von 77% entspricht.
+
+Die Sensitivität, oder auch True-Positive-Rate, umschreibt die Fälle in denen positiv klassifizierte Datenpunkte auch tatsächlich positiv waren. Diese beträgt in unserem Fall 55,88%
+
+Die Spezifizität, oder auch True Negative Rate, misst alle Fälle in denen negativ klassifizierte Datenpunkte auch tatsächlich negativ waren. Diese beträgt in unserem Fall 87,88%.

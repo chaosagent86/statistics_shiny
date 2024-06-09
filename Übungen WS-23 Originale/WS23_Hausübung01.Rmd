@@ -1,0 +1,257 @@
+---
+title: "Hausübung 01 - Wahrscheinlichkeitstheorie"
+author: "Baier Sebastian, Magdalena Figlmüller, Alice Schwarzböck"
+date: "2023-11-29"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Aufgabe 1
+
+DNA ist bekanntermaßen aus 4 Nukleinsäuren (A, C, G, T) aufgebaut. Kodierende und nichtkodierende
+Regionen werden dabei unterschieden.
+
+a) Wie wahrscheinlich ist es, in einer nicht-kodierenden Region (von der Länge 10.000 bp),
+bei der wir annehmen, dass die Basen zufällig angeordnet sind, die Sequenz des Stop-Codons
+einmal zu änden?
+
+
+Anzahl der möglichen Triplets: 4^3 = 64$\\$
+3 Stopp-Codons: --> p(Stop) = 3/64$\\$
+Gegenwahrscheinlichkeit = 61/64
+
+Es gibt in einer Sequenz mit 10.000 Basen 9998 mögliche Triplets:
+
+Reading Frame 1: 3333 (Position 1 bis 9999)$\\$
+Reading Frame 2: 3333 (Position 2 bis 10000)$\\$
+Reading Frame 3: 3332 (Position 3 bis 9998)$\\$
+
+
+Demnach kann die Wahrscheinlichkeit wie folgt berrechnet werden: 
+
+$$\binom{9998}{1}*({3\over64})*({61\over64})^{9997}$$
+
+
+```{r Aufgabe1a}
+
+stop <- choose(9998,1)*(3/64)*(61/64)**9997
+
+```
+Die Wahrscheinlichkeit einmal ein Stopkodon zu finden liegt bei `r stop * 100`
+
+
+b) Wie wahrscheinlich ist es, in derselben nicht-kodierenden Region die Folge 
+A-A-A-A-C-C-G-A-T-C-G-A-T-T-G-A anzutreffen?
+
+Sequenz AAAACCGATCGATTGA => Länge: 16 Basen    
+Wahrscheinlichkeit für ein bestimmte Sequenz mit 16 Basen: p(Seq) = (1/4)^16
+
+Es gibt in der nicht-kodierenden Region mit der Länge 10.000 Basen 9985 Möglichkeiten, die Seqeunz anzuordnen (Sequenz der Länge 16 + 9984x um 1 verschieben = 10.000) 
+Somit kann die Wahrsheinlichkeit wie folgt berechnet werden:
+
+
+$$\binom{9985}{1}*({1\over4})^{16}*({3\over4})^{9969}$$
+
+```{r Aufgabe1b}
+
+seq16 <- choose(9985,1)*(1/4)**16*(3/4)**9969
+
+```
+
+Die Wahrscheinlichkeit diese Sequenz in der Region aufzufinden, liegt annähernd bei `r seq16 * 100`
+
+
+## Aufgabe 2
+
+Ermitteln Sie, wie sich die Wahrscheinlichkeiten beim Lottospielen für 5er und 6er verändern
+wurden, wenn man die Kugel nach dem Ziehen wieder zurücklegen würde. Wie würde sich
+diese Veränderung auf die Gewinnwahrscheinlichkeiten von Lotterie und Spielern auswirken?
+Begründen Sie warum man nicht zulässt, dass 6-6-6-6-6-6 eine Möglichkeit für einen Lottosechser
+bietet?
+
+1) Lotto-6er:
+
+```{r Aufgabe2_6er}
+
+# Möglichkeiten ohne Zurücklegen
+(six1 <- choose(45,6))
+# Wahrscheinlichkeit ohne Zurücklegen
+1/six1
+
+# Möglichkeiten mit Zurücklegen
+(six2 <- factorial(50)/((factorial(6)*factorial(44))))
+  
+# Wahrscheinlichkeit ohne Zurücklegen
+1/six2
+
+# Unterschied Erfolgschancen
+six2/six1
+
+```
+
+Lotto-6er: Für einen Lotto-6er exisiteren `r six1` Möglichkeiten (--> Wahrscheinlichkeit: `r 1/six1`), für einen Lotto-6er mit Zurücklegen sind es `r six2`(--> Wahrscheinlichkeit: `r 1/six2`). 
+Somit sind die Erfolgschancen für einen Spieler durch Zurücklegen etwa `r six2/six1` x niedriger als ohne Zurücklegen. 
+
+--> Aufgrund der nochmals niedrigeren Wahrscheinlichkeit ist 6-6-6-6-6-6 als Lotto-6er nicht zulässig.
+
+
+2) Lotto-5er:
+
+```{r Aufgabe2_5er}
+
+# Möglichkeiten ohne Zurücklegen
+(five1 <- choose(45,5))
+# Wahrscheinlichkeit ohne Zurücklegen
+1/five1
+
+# Möglichkeiten mit Zurücklegen
+(five2 <- factorial(49)/((factorial(5)*factorial(44))))
+# Wahrscheinlichkeit ohne Zurücklegen
+1/five2
+
+# Unterschied Erfolgschancen
+five2/five1
+
+```
+
+Lotto-5er: Für einen Lotto-5er exisiteren `r five1` Möglichkeiten (--> Wahrscheinlichkeit: `r 1/five1`), für einen Lotto-5er mit Zurücklegen sind es `r five2` (--> Wahrscheinlichkeit: `r 1/five2`).
+Somit sind die Erfolgschancen für einen Spieler durch Zurücklegen etwa `r five2/five1`x niedriger als ohne Zurücklegen. 
+
+
+## Aufgabe 3
+
+Aminosäuren werden durch Codons, die sich aus 3 Nukleinsäuren zusammensetzen, kodiert.
+Wie viele Aminosäuren könnte man mit dieser Methode eindeutig kodieren? Wie viele sind es
+wirklich? Begründen Sie den Unterschied.
+
+Mögliche Anzahl an eindeutig kodierten Aminosäuren beträgt: 4^3 = 64
+
+Diese 64 Codons kodieren nur für 20 (21) Aminosäuren aufgrund der Tatsache, dass der genetische Code degeneriert ist (--> mehrere Codons pro Aminosäure, jedoch vereinzelt Ausnahmen: z.B. Methionin). 
+
+## Aufgabe 4
+
+Ein neu entwickelter HIV-Test entdeckt 98% der tatsäachlich HIV Positiven. Allerdings schlägt
+er auch bei 5 % der HIV-Negativen an. In Österreich lebten 2009 etwa 15.000 infzierte Menschen,
+davon 4600 Frauen (laut UNAIDS 2010). Wie groß ist die Wahrscheinlichkeit, dass Sie
+an HIV erkrankt sind, wenn Sie einen positiven Testbescheid bekommen?
+
+Bevölkerung Österreich 2010 [Quelle: Weltbank, Eurostat]: 8363000$\\$
+Es wird näherungsweise von einer Verteilung von 50% Männern und 50% Frauen ausgegangen. 
+
+
+```{r Aufgabe4}
+
+p_HIV <- 15000/8363000
+p_HIVmale <- 10400/4181500
+p_HIVfemale <- 4600/4181500
+p_HIV_neg <- 1-p_HIV
+p_HIVfemale_neg <- 1-p_HIVfemale
+p_HIVmale_neg <- 1-p_HIVmale
+
+#Wahrscheinlichkeit an HIV erkrankt zu sein und einen positiven Test zu erhalten 
+HIVpos_Testpos <- p_HIV * 0.98
+HIVmalepos_Testpos <- p_HIVmale * 0.98
+HIVfemalepos_Testpos <- p_HIVfemale * 0.98
+
+#Wahrscheinlichkeit für positiven Test
+posTest <- HIVpos_Testpos + p_HIV_neg * 0.05
+posTestmale <- HIVmalepos_Testpos + p_HIVmale_neg * 0.05
+posTestfemale <- HIVfemalepos_Testpos + p_HIVfemale_neg * 0.05
+
+#Wahrscheinlichkeit an HIV zu erkranken bei positiven Test
+HIV <- HIVpos_Testpos / posTest
+HIVmale <- HIVmalepos_Testpos / posTestmale
+HIVfemale <- HIVfemalepos_Testpos / posTestfemale
+
+```
+Die Wahrscheinlichkeit als Frau HIVpositiv zu sein bei positivem Testergebnis liegt bei rund `r HIVfemale * 100` %.
+Die Wahrscheinlichkeit als Mann HIVpositiv zu sein bei positivem Testergebnis liegt bei rund `r HIVmale * 100` %.
+Die Wahrscheinlichkeit als Mann oder Frau HIVpositiv zu sein bei positivem Testergebnis liegt bei rund `r HIV * 100`%.
+
+
+## Aufgabe 5
+
+Die Krankheit Lupus erythematodes zeigt eine Inzidenz von 25 jährlich Neuerkrankten pro
+100.000 Personen. Neun von zehn Betroffenen sind Frauen aufgrund des geschlechtsspezifischen 
+Signalwegs der Interferon-alpha-Induktion. Im AKH Wien werden jährlich etwa 200000
+PatientInnen, davon 80000 Patientinnen stationär aufgenommen. Wie wahrscheinlich ist es,
+dass eine dieser Frauen an Lupus leidet?
+
+```{r Aufgabe5}
+
+Lup_year_female <- 25 / 100000 * 0.9
+AKH_female <- 80000 / 200000
+female_lupAKH <- Lup_year_female / AKH_female * 100
+
+```
+Die Wahrscheinlichkeit, dass eine Frau an Lupus leidet liegt bei `r female_lupAKH`%.
+
+## Aufgabe 6
+
+Erklären Sie anhand der beiden Grafken die Begriffe: Laplace-Wahrscheinlichkeit, Variation,
+Kombination, Permutation, bedingte Wahrscheinlichkeit, statistische Unabhängigkeit.$\\$
+
+
+LAPLACE-WAHRSCHEINLICHKEIT:
+
+Beschreibt die Wahrscheinlichkeit des Eintritts eines bestimmten Ereignisses in Verhältnis zu allen 
+möglichen Ereignissen.
+
+z.B. Wahrscheinlichkeit für grünen Käfer:  
+
+$$p(green) = {4\over9}$$
+
+
+VARIATION:
+
+Wenn für die Berechnung der Wahrscheinlichkeit die Reihenfolge relevant ist, wird von Variation gesprochen.
+
+OHNE ZURÜCKLEGEN (--> gezogene Elemente werden aus der Grundgesamtheit entfernt):$\\$
+Die Möglichkeiten der Variation von k Elementen aus einer Grundgesamtheit n, werden durch folgende Formel beschrieben:
+$${n!\over n-k!}$$
+Werden beispielsweise 2 der 9 Käfer gezogen, exisiteren 9*8 = 72 verschiedene Möglichkeiten, Käfer zu ziehen.$\\$
+
+
+MIT ZURÜCKLEGEN (--> gezogene Elemente werden zur Grundgesamtheit zurückgelegt):$\\$
+$${n^{k}}$$
+Werden hier 2 Käfer gezogen, wird der 1.Käfer nach dem Zug zurückgelegt und kann erneut gezogen werden. Folglich exisiteren mit Zurücklegen mehr Möglichkeiten --> 9*9 = 81.$\\$
+
+
+KOMBINATION:
+
+Wenn die Reihenfolge für die Berechnung der Wahrscheinlichkeit nicht relevant ist, wird von Kombination gesprochen.
+
+OHNE ZURÜCKLEGEN (--> gezogene Elemente werden aus der Grundgesamtheit entfernt):$\\$
+Die Möglichkeiten der Kombination von k Elementen aus einer Grundgesamtheit n, werden durch folgende Formel beschrieben:
+$$\binom{n}{k}$$
+
+Werden unter diesen Bedingungen 2 der 9 Käfer gezogen, exisiteren 36 verschiedene Möglichkeiten. Dies entspricht genau der Hälfte an Möglichkeiten gegenüber Variation ohne Zurücklegen, 
+denn da es unerheblich ist, ob bei einer bestimmten Käferkombination Käfer1 oder Käfer2 zuerst gezogen wird, reduzieren sich die Möglichkeiten um 50%.
+
+MIT ZURÜCKLEGEN (--> gezogene Elemente werden zur Grundgesamtheit zurückgelegt):$\\$
+$${(n+k-1)!\over k!*(n-1)!}$$
+Es werden erneut 2 der 9 Käfer gezogen, wobei der 1.Käfer zurückgelegt wird und erneut gezogen werden kann. Mit Zurücklegen exisiteren daher mehrere Möglichkeiten, für das konkrete Beispiel sind es 45.$\\$
+
+
+PERMUTATION
+
+Permutation beschreibt die Anzahl an Möglichkeiten die Reihenfolge von Objekten zu verändern. Die Grundformel lautet:
+$$n!$$
+Für die 9 abgebildeten Käfer gebe es demnach 9! = 362880 mögliche Reihenfolgen (9 für den ersten Käfer, 8 für den 2.Käfer, 7 für den 3.Käfer,.....) $\\$
+
+
+BEDINGTE WAHRSCHEINLICHKEIT
+
+Die bedingte Wahrscheinlichkeit beschreibt die Häufigkeit eines Ereignisses B unter der Voraussetzung, dass Ereignis A eingetreten ist. 
+Ein Beispiel wäre hier die Wahrscheinlichkeit, dass ein gezogener grüner Käfer gepunktet ist.  
+
+$$p(spotty|green) = {4\over9}* {1\over4} = {1\over9} $$
+
+$\\$STATISTISCHE UNABHÄNGIGKEIT
+
+An letzterem Beispiel kann auch gut statistische Unabhängigkeit demonstriert werden, welche einerseits symmetrisch ist (es ist somit egal, welches der beiden Ereignisse zuerst eintritt) und weiters besagt, dass Ereignisse voneinander unabhängig sind, wenn ihre Eintrittswahrscheinlichkeit miteinander multipliziert der Wahrscheinlichkeit des Eintritts beider Ereignisse zum selben Zeitpunkt entspricht 
+
+$$p(spotty+green) = {4\over9}* {1\over4} = {3\over9}* {1\over3} = {1\over9} $$

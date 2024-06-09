@@ -227,11 +227,23 @@ server <- function(input, output, session) {
     }
   }, height = 700, width = 700)
   
-  # Output the selected dataset as a Mosaic plot
+  #Output the selected dataset as a Mosaic plot
   output$mosaic <- renderPlot({
     data <- selectedData()
-    if (!is.null(data)) {
-        mosaic(data, main = "Mosaic Plot", shade = TRUE, legend = TRUE)
+    if (length(input$MosaicPlotColumns) == 0) {
+      plot.new()
+      title(main = "Mosaic Plot (no Data chosen)")
+    } else {
+    formula <- as.formula(paste("Freq ~", paste(input$MosaicPlotColumns, collapse = " + ")))
+    mosaic(formula, data, 
+             main = "Mosaic Plot", shade = TRUE, legend = TRUE)
+        #mosaic(data, main = "Mosaic Plot", shade = TRUE, legend = TRUE)
       }
   }, height = 700, width = 700)
+  
 }
+
+
+
+
+

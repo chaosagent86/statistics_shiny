@@ -1,0 +1,1528 @@
+---
+title: "Hausübung 02: Explorative Datenanalyse"
+author: "Baier Sebastian, Figlmüller Magdalena, Schwarzböck Alice"
+date: "29.11.2023"
+output: 
+  pdf_document:
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+\pagebreak
+# Beispiel 2.1
+
+## 2.1.1 Übersicht über den Datensatz "swiss"
+
+Der Datensatz "swiss" aus der R Package "utils" beinhaltet Messungen nachfolgender Indikatoren aus 47 Französisch-sprechenden Provinzen der Schweiz aus dem Jahr 1888, als die schweizer Bevölkerung den Beginn eines 
+demographischen Wandels erlebte:
+
+- Fertility (standardisierte Fruchtbarkeit Ig, in %)
+- Agriculture (in der Landwirtschaft tätige Männer, in %)
+- Examination (Personen die bei der Armeeprüfung die höchste Note erreichten, in %; nicht Teil der Aufgabenstellung)
+- Education (Wehrpflichtige, die eine über die Grundschule hinausgehende Ausbildung besitzen, in %)
+- Catholic (Katholische Religionszugehörigkeit, in %)
+- Infant.Mortality (Säuglingssterberate: Babies die lebend geboren wurden, aber innerhalb des ersten Lebensjahres verstarben, in %)
+
+Es folgt eine Übersicht über Minima, Maxima, Mittelwerte, Mediane und die 1. und 3. Quantilwerte aller Variablen: 
+
+```{r swiss stats1, comment=">"}
+library(utils)
+help(swiss)
+summary(swiss)
+```
+Der Datensatz besteht aus insgesamt 6 Variablen mit 47 Observationen im jeweils genannten Datentyp (numerisch oder integer):
+```{r swiss stats2, comment=">"}
+str(swiss)
+```
+\pagebreak
+## 2.1.2 Fertility
+Die in der Variable "Fertility" enthaltenen Werte sollen die standardisierte Fruchtbarkeit der Bevölkerungsgruppe in Prozent widerspiegeln. Die Verteilung der Werte kann beispielsweise folgendermaßen grafisch dargestellt werden:
+
+```{r fert_plots, include=FALSE, message=FALSE, warning=FALSE}
+library(ggplot2)
+
+df1 <- as.data.frame(swiss[,1:6])
+fert_hist <- ggplot(df1, aes(x = `Fertility`, y= after_stat(density)))+
+  geom_histogram(color="black", fill="lightgrey", breaks = seq(20, 100, by = 5))+
+  geom_density(color = "red")+
+  theme_classic()+
+  ggtitle("Histogram Fertility")+
+  labs(x= "Fertility (%)", y = "Density")+
+  scale_x_continuous(breaks=seq(0,100,by=10))+
+  theme(plot.title = element_text(hjust = 0.5))
+fert_hist
+
+fert_box <- ggplot(df1, aes(x = `Fertility`))+
+  geom_boxplot(color="black", fill="lightgrey", width = 2)+
+  theme_classic()+
+  ggtitle("Boxplot Fertility")+
+  labs(x= "Fertility (%)", y = "y")+
+  scale_x_continuous(breaks=seq(0,100,by=10))+
+  theme(plot.title = element_text(hjust = 0.5),  axis.title.y = element_text(size = 30, color="white"), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+fert_box
+
+fert_qq <- ggplot(df1, aes(sample=df1$Fertility))+
+  stat_qq()+
+  stat_qq_line(color="red")+
+  theme_classic()+
+  ggtitle("Q-Q-Plot Fertility")+
+  labs(x= "Theoretical Quantiles", y = "Sample Quantiles")+
+  scale_y_continuous(limits=c(20,100,by=20))+
+  theme(plot.title = element_text(hjust = 0.5))
+fert_qq
+
+fert_ecdf <- ggplot(df1, aes(df1$Fertility))+
+  stat_ecdf(geom = "step")+
+    theme_classic()+
+  ggtitle("ECDF Fertility")+
+  labs(x= "Fertility (%)", y = "Frequency")+
+  scale_x_continuous(limits=c(20,100,by=10))+
+  theme(plot.title = element_text(hjust = 0.5))
+fert_ecdf
+
+fert_violin <- ggplot(df1, aes(x = 1, y = df1$Fertility))+
+  geom_violin(trim = FALSE, fill = "lightgrey", width = 1)+
+  geom_boxplot(width = 0.1)+
+  theme_classic()+
+  ggtitle("Violinplot Fertility")+
+  labs(x= "y", y = "Fertility(%)")+
+  coord_flip()+
+  scale_y_continuous(limits=c(20,100,by=10))+
+  theme(plot.title = element_text(hjust = 0.5), axis.title.y = element_text(size = 30, color="white"), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+fert_violin
+
+library(gridExtra)
+png("fert_plots.png", width = 6, height =7, units ='in', res = 900)
+fert_plots <- grid.arrange(fert_hist, fert_box, fert_qq, fert_violin, fert_ecdf, nrow=3)
+dev.off()
+```
+
+```{r fert_plots2, include=FALSE, message=FALSE, warning=FALSE, eval=FALSE, fig.height=3}
+
+fert_plots
+
+```
+
+\includegraphics{fert_plots.png}
+
+Die dargestellten Grafik-Arten wurden aus folgenden Gründen für die Explorative Datenanalyse aller Übungsaufgaben gewählt:
+
+1. Histogramm mit Density Kurve: dient als einfache Darstellungsform der Datenverteilung indem es die Dichtefunktion abbildet, und gibt Auskunft, ob ein Datensatz uni- oder multimodal ist. Auch linksschiefe oder rechtsschiefe Datenverteilungen sind zu erkennen.
+
+2. Boxplot: stellt den Median und die Quantile auf eine robuste Art und Weise dar und gibt erste Hinweise auf potentielle Ausreißer. 
+
+3. Q-Q-Plot (Normal Q-Q Plot): visualisiert ob die Daten normalverteilt sind indem er die Werte der Stichprobe mit der Standardnormalverteilung (dargestellt als rote Linie) vergleicht. Außerdem gibt ein Q-Q-Plot Auskunft darüber, ob ein Datensatz leichte oder schwere Ränder besitzt und kann bei der Ausreißer-Erkennung helfen.
+
+4. ECDF Plot: die Empirische kumulative Verteilungsfunktion hilft bei der Ausreißer-Erkennung, visualisiert die Quantile und kann ebenfalls Auskunft über die Verteilung der Daten geben (Modalität). 
+
+5. Violin Plot: dient als alternative grafische Darstellung der Datenverteilung zu Boxplot und Histogramm, indem es wesentliche Charakteristiken der beiden kombiniert.
+
+
+```{r fertility stats, include=FALSE, message=FALSE, warning=FALSE}
+library(psych)
+mean(swiss[,1])
+median(swiss[,1])
+sd(swiss[,1])
+IQR(swiss[,1])
+skew(swiss[,1])
+kurtosi(swiss[,1])
+shapiro.test(swiss[,1])
+```
+
+Die Lageschätzer Mittelwert `r options(digits=3);mean(swiss[,1])` % und Median `r options(digits=3);median(swiss[,1])` % der Fertility Variable sind sich sehr ähnlich, was als erster Indikator dient, dass die Daten möglicherweise symmetrisch angesiedelt sind und einer Normalverteilung folgen könnten. 
+
+Histogramm und Violinplot zeigen, dass die Daten unimodal verteilt sind. In den Boxplots sind zwei potentielle Ausreißer am linken Rand zu erkennen. Da sich durch die verbleibenden 45 Werte jedoch 95 % der Daten erklären lassen und der Datensatz durch die beiden laut Boxplot jenseits des Minimums liegenden Werte nicht großartig verzerrt wird, können diese toleriert werden. Die potentiellen Ausreißer sind auch im unteren Bereich der empirischen kumulativen Verteilungsfunktion (ECDF Plot) zu erkennen. 
+
+Der Mittelwert ist leicht nach links verzerrt, da die Daten, wie das Histogramm zeigt, leicht linksschief sind. Im Q-Q-Plot wird ein schwerer linker Rand angedeutet, da die drei Punkte am linken Rand weiter weg vom Zentrum (Median) liegen als im Vergleich zur roten Linie normal wäre. Der Großteil der Datenpunkte im Q-Q-Plot liegt jedoch auf oder sehr nahe an der roten Linie (welche eine Normalverteilung widerspiegelt), bei den drei stärker abweichenden Punkten am linken Rand handelt es sich somit nur um einen geringen Anteil der Daten. Das Gewicht in den Rändern bzw. die Exzess-Kurtosis liegt mit `r options(digits=3);kurtosi(swiss[,1])` im leicht positiven Bereich, was im Vergleich zur Normalverteilung (wo Exzess-Kurtosis = 0) ebenfalls in sehr geringem Maße auf schwere Ränder und auf das mögliche Vorhandensein von Ausreißern hindeutet. Die Schiefe bzw. Skewness der Daten liegt bei `r options(digits=3);skew(swiss[,1])`. Da als Richtwert angenommen wurde, dass Daten mit einer Schiefe zwischen -0,5 und 0,5 nahezu symmetrisch angesiedelt sind, kann der gegenständliche Datensatz als **symmetrisch** bezeichnet werden (siehe auch: *https://www.analyticsvidhya.com/blog/2021/05/shape-of-data-skewness-and-kurtosis/*). 
+
+```{r fertility stats2, , comment=">", include=TRUE, message=FALSE, warning=FALSE}
+shapiro.test(swiss$Fertility)
+```
+
+Insgesamt kann aufgrund der genannten Beobachtungen von einer **Normalverteiliung** ausgegangen werden. Der zusätzlich zur exploriativen Datenanlyse durchgeführte Shapiro-Wilk Test bekräftigt dies mit einem p-Wert > 0.05. Daher können **das arithmetische Mittel (`r options(digits=3);mean(swiss[,1])` %)** und **die Standardabweichung (`r options(digits=3);sd(swiss[,1])` %)** als Lage- und Variationsmaße für die Variable Fertility herangezogen werden. 
+
+Robustere Maße wären im Vergleich dazu der oben genannte Median (`r options(digits=3);median(swiss[,1])` %), die mittlere absolute Abweichung des Medians, kurz der MAD des Medians (`r options(digits=3);mad(swiss[,1])` %), oder auch die Interquartilsdistanz (`r IQR(swiss[,1])` %).
+
+\pagebreak
+## 2.1.3 Agriculture
+
+Die in der Variable "Agriculture" enthaltenen Werte sollen die Anzahl der Männer in Prozent widerspiegeln, welche beruflich in der Landwirtschaft tätig sind. Die Verteilung der Werte kann beispielsweise folgendermaßen grafisch dargestellt werden:
+
+```{r agriculture_plots, include=FALSE, message=FALSE, warning=FALSE}
+
+df1 <- as.data.frame(swiss[,1:6])
+agri_hist <- ggplot(df1, aes(x = `Agriculture`, y= after_stat(density)))+
+  geom_histogram(color="black", fill="lightgrey", breaks = seq(0, 100, by = 10))+
+  geom_density(color = "red")+
+  theme_classic()+
+  ggtitle("Histogram Agriculture")+
+  labs(x= "Males in Agriculture (%)", y = "Density")+
+  scale_x_continuous(breaks=seq(0,100,by=10))+ 
+  scale_y_continuous(breaks=seq(0.00,0.02,by=0.01))+
+  theme(plot.title = element_text(hjust = 0.5))
+agri_hist
+
+agri_box <- ggplot(df1, aes(x = `Agriculture`))+
+  geom_boxplot(color="black", fill="lightgrey", width = 2)+
+  theme_classic()+
+  ggtitle("Boxplot Agriculture")+
+  labs(x= "Males in Agriculture (%)", y = "y")+
+  scale_x_continuous(breaks=seq(0,100,by=10))+
+  theme(plot.title = element_text(hjust = 0.5),  axis.title.y = element_text(size = 30, color="white"), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+agri_box
+
+agri_qq <- ggplot(df1, aes(sample=df1$Agriculture))+
+  stat_qq()+
+  stat_qq_line(color="red")+
+  theme_classic()+
+  ggtitle("Q-Q-Plot Agriculture")+
+  labs(x= "Theoretical Quantiles", y = "Sample Quantiles")+
+  scale_y_continuous(breaks=c(0,20,40,60,80,100))+
+  theme(plot.title = element_text(hjust = 0.5))
+agri_qq
+
+agri_ecdf <- ggplot(df1, aes(df1$Fertility))+
+  stat_ecdf(geom = "step")+
+    theme_classic()+
+  ggtitle("ECDF Agriculture")+
+  labs(x= "Males in Agriculture (%)", y = "Frequency")+
+  scale_x_continuous(limits=c(20,100,by=10))+
+  theme(plot.title = element_text(hjust = 0.5))
+agri_ecdf
+
+agri_violin <- ggplot(df1, aes(x = 1, y = df1$Agriculture))+
+  geom_violin(trim = FALSE, fill = "lightgrey", width = 1)+
+  geom_boxplot(width = 0.1)+
+  theme_classic()+
+  ggtitle("Violinplot Agriculture")+
+  labs(x= "y", y = "Males in Agriculture (%)")+
+  coord_flip()+
+  scale_y_continuous(limits=c(0,100,by=10))+
+  theme(plot.title = element_text(hjust = 0.5), axis.title.y = element_text(size = 30, color="white"), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+agri_violin
+
+library(gridExtra)
+png("agri_plots.png", width = 6, height =7, units ='in', res = 900)
+agri_plots <- grid.arrange(agri_hist, agri_box, agri_qq, agri_violin, agri_ecdf, nrow=3)
+dev.off()
+```
+
+
+\includegraphics{agri_plots.png}
+
+```{r agriculture stats, include=FALSE, message=FALSE, warning=FALSE}
+library(psych)
+mean(swiss[,2])
+median(swiss[,2])
+mad(swiss[,2])
+sd(swiss[,2])
+IQR(swiss[,2])
+skew(swiss[,2])
+kurtosi(swiss[,2])
+shapiro.test(df1$Agriculture)
+```
+
+Die Lageschätzer Mittelwert `r options(digits=3);mean(swiss[,2])` % und Median `r options(digits=3);median(swiss[,2])` % der Agriculture Variable sind sich weniger ähnlich als die der Fertility Variable. Der Mittelwert ist eindeutig nach links verzerrt, da die Daten wie in Histogramm und Violinplot ersichtlich, zwar unimodal verteilt aber linksschief sind. In den Boxplots sind keine Ausreißer zu erkennen. 
+
+Im Q-Q-Plot wird ein leichter rechter Rand angedeutet, der Großteil der Datenpunkte liegt jedoch auf oder sehr nahe an der roten Linie. Es weichen am rechten Rand nur zwei der Punkte stärker von der roten Linie ab. Das Gewicht in den Rändern bzw. die Exzess-Kurtosis liegt mit `r options(digits=3);kurtosi(swiss[,2])` im negativen Bereich, was ebenfalls auf leichte Ränder und eine flachere Datenverteilung mit niedrigerem Peak hindeutet als dies bei normalverteilten Daten zu erwarten wäre. Die Schiefe bzw. Skewness der Daten liegt bei `r options(digits=3);skew(swiss[,2])`. Da als Richtwert angenommen wurde, dass Daten mit einer Schiefe zwischen -0,5 und 0,5 nahezu symmetrisch angesiedelt sind, kann der gegenständliche Datensatz zwar anhand der Skewness-Berechnung eventuell insgesamt als symmetrisch bezeichnet werden, jedoch nur wenn man nicht vom höchsten Peak als Mittelpunkt ausgeht. 
+
+```{r agriculture stats2, , comment=">", include=TRUE, message=FALSE, warning=FALSE}
+shapiro.test(swiss$Agriculture)
+```
+
+Der zusätzlich zur explorativen Datenanalyse durchgeführte Shapiro-Wilk Test auf Normalverteilung ergibt für die Daten der Variable Agriculture einen p-Wert > 0.05, was bedeutet, dass sich die Verteilung der Stichprobe nicht wesentlich von einer Normalverteilung unterscheidet. Insgesamt sind die Daten also auch hier **approximativ normalverteilt**, wenn auch weniger eindeutig als in 2.1.2. 
+Aufgrund der Schiefe der Daten und des Unterschieds zwischen Mittelwert und Median, empfehlen sich hier allerdings der **Median (`r options(digits=3);median(swiss[,2])` %)** und der **MAD des Medians (`r options(digits=3);mad(swiss[,2])` %)** als robuste Lage- und Variationsmaße. Die Interquartilsdistanz beträgt `r IQR(swiss[,2])` %.
+
+Nicht robuste Lage- und Variatsionsmaße sind im Vergleich dazu das arithmetische Mittel (`r options(digits=3);mean(swiss[,2])` %) und die Standardabweichung (`r options(digits=3);sd(swiss[,2])` %). 
+
+\pagebreak
+## 2.1.4 Education
+
+Die in der Variable "Education" enthaltenen Werte sollen die Anzahl der wehrpflichtigen Schweizer in Prozent widerspiegeln, welche eine über die Grundschule hinausgehende Bildung haben. Die Verteilung der Werte kann beispielsweise folgendermaßen grafisch dargestellt werden:
+
+```{r education_plots, include=FALSE, message=FALSE, warning=FALSE}
+help(swiss)
+df1 <- as.data.frame(swiss[,1:6])
+edu_hist <- ggplot(df1, aes(x = `Education`, y= after_stat(density)))+
+  geom_histogram(color="black", fill="lightgrey", breaks = seq(0, 60, by = 5))+
+  geom_density(color = "red")+
+  theme_classic()+
+  ggtitle("Histogram Education")+
+  labs(x= "Education beyond Primary School (%)", y = "Density")+
+  scale_x_continuous(breaks=seq(0,60,by=10))+ 
+ # scale_y_continuous(breaks=seq(0.00,0.02,by=0.01))+
+  theme(plot.title = element_text(hjust = 0.5))
+edu_hist
+
+edu_box <- ggplot(df1, aes(x = `Education`))+
+  geom_boxplot(color="black", fill="lightgrey", width = 2)+
+  theme_classic()+
+  ggtitle("Boxplot Education")+
+  labs(x= "Education beyond Primary School (%)", y = "y")+
+  scale_x_continuous(breaks=seq(0,60,by=10))+
+  theme(plot.title = element_text(hjust = 0.5),  axis.title.y = element_text(size = 30, color="white"), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+edu_box
+
+edu_qq <- ggplot(df1, aes(sample=df1$Education))+
+  stat_qq()+
+  stat_qq_line(color="red")+
+  theme_classic()+
+  ggtitle("Q-Q-Plot Education")+
+  labs(x= "Theoretical Quantiles", y = "Sample Quantiles")+
+  scale_y_continuous(breaks=c(0,20,40,60))+
+  theme(plot.title = element_text(hjust = 0.5))
+edu_qq
+
+edu_ecdf <- ggplot(df1, aes(df1$Education))+
+  stat_ecdf(geom = "step")+
+    theme_classic()+
+  ggtitle("ECDF Education")+
+  labs(x= "Education beyond Primary School (%)", y = "Frequency")+
+  scale_x_continuous(limits=c(0,60,by=10))+
+  theme(plot.title = element_text(hjust = 0.5))
+edu_ecdf
+
+edu_violin <- ggplot(df1, aes(x = 1, y = df1$Education))+
+  geom_violin(trim = FALSE, fill = "lightgrey", width = 1)+
+  geom_boxplot(width = 0.1)+
+  theme_classic()+
+  ggtitle("Violinplot Education")+
+  labs(x= "y", y = "Education beyond Primary School (%)")+
+  coord_flip()+
+  scale_y_continuous(limits=c(0,60,by=10))+
+  theme(plot.title = element_text(hjust = 0.5), axis.title.y = element_text(size = 30, color="white"), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+edu_violin
+
+library(gridExtra)
+png("edu_plots.png", width = 6, height =7, units ='in', res = 900)
+edu_plots <- grid.arrange(edu_hist, edu_box, edu_qq, edu_violin, edu_ecdf, nrow=3)
+dev.off()
+```
+
+
+
+\includegraphics{edu_plots.png}
+
+```{r education stats, include=FALSE, message=FALSE, warning=FALSE}
+library(psych)
+mean(swiss[,4])
+median(swiss[,4])
+sd(swiss[,4])
+IQR(swiss[,4])
+skew(swiss[,4])
+kurtosi(swiss[,4])
+shapiro.test(df1$Education)
+```
+
+Die Lageschätzer Mittelwert `r options(digits=3);mean(swiss[,4])` % und Median `r options(digits=3);median(swiss[,4])` % der Education Variable zeigen, dass der Mittelwert eindeutig nach rechts verzerrt ist, da die Daten wie in Histogramm und Violinplot ersichtlich, zwar unimodal aber stark rechtsschief sind. Im Q-Q-Plot ist ein eindeutiger schwerer rechter Rand ersichtlich. Die Boxplots haben zwar Outlier identifiziert (und vor allem der Wert > 50 % ist auch im ECDF Plot eindeutig erkennbar), aufgrund des schweren rechten Randes sollten diese allerdings nicht als Ausreißer behandelt werden. Das Gewicht in den Rändern bzw. die Exzess-Kurtosis liegt mit `r options(digits=3);kurtosi(swiss[,4])` eindeutig im positiven Bereich, was bedeutet, dass sich die Verteilung der Daten durch stärker ausgeprägte Randbereiche als die Normalverteilung auszeichnet. Die Schiefe bzw. Skewness der Daten liegt mit `r options(digits=3);skew(swiss[,4])` außerhalb der als Richtwert angenommenen Schiefe zwischen -0,5 und 0,5, weshalb es sich eindeutig um **asymmetrisch angesiedelte** Daten handelt. Ein Blick auf Histogramm und Violinplot bestätigt dies. 
+
+```{r education stats2, , comment=">", include=TRUE, message=FALSE, warning=FALSE}
+shapiro.test(swiss$Education)
+```
+
+Der zusätzlich zur explorativen Datenanalyse durchgeführte Shapiro-Wilk Test auf Normalverteilung ergibt für die Daten der Variable Education einen p-Wert < 0.05, was zusätzlich zu den grafischen Darstellungen darauf hindeutet, dass die Daten **nicht normalverteilt** sind.  
+Aufgrund der Schiefe der Daten und des Unterschieds zwischen Mittelwert und Median, empfehlen sich hier ebenfalls der **Median (`r options(digits=3);median(swiss[,4])` %)** und der **MAD des Medians (`r options(digits=3);mad(swiss[,4])` %)** als robuste Lage- und Variationsmaße. Die Interquartilsdistanz beträgt `r IQR(swiss[,4])` %.
+
+Nicht robuste Lage- und Variationsmaße sind im Vergleich dazu das arithmetische Mittel (`r options(digits=3);mean(swiss[,4])` %) und die Standardabweichung (`r options(digits=3);sd(swiss[,4])` %). 
+
+\pagebreak
+## 2.1.5 Catholic
+
+Die in der Variable "Catholic" enthaltenen Werte repräsentieren diejenigen Personen im Datensatz in Prozent, welche eine katholische Religionszugehörigkeit haben. Die Verteilung der Werte kann beispielsweise folgendermaßen grafisch dargestellt werden:
+
+```{r catholic_plots, include=FALSE, message=FALSE, warning=FALSE}
+help(swiss)
+df1 <- as.data.frame(swiss[,1:6])
+cat_hist <- ggplot(df1, aes(x = `Catholic`, y= after_stat(density)))+
+  geom_histogram(color="black", fill="lightgrey", breaks = seq(0, 100, by = 10))+
+  geom_density(color = "red")+
+  theme_classic()+
+  ggtitle("Histogram Catholic")+
+  labs(x= "Catholics (%)", y = "Density")+
+  scale_x_continuous(breaks=seq(0,100,by=10))+ 
+ # scale_y_continuous(breaks=seq(0.00,0.02,by=0.01))+
+  theme(plot.title = element_text(hjust = 0.5))
+cat_hist
+
+cat_box <- ggplot(df1, aes(x = `Catholic`))+
+  geom_boxplot(color="black", fill="lightgrey", width = 2)+
+  theme_classic()+
+  ggtitle("Boxplot Catholic")+
+  labs(x= "Catholics (%)", y = "y")+
+  scale_x_continuous(breaks=seq(0,100,by=10))+
+  theme(plot.title = element_text(hjust = 0.5),  axis.title.y = element_text(size = 30, color="white"), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+cat_box
+
+cat_qq <- ggplot(df1, aes(sample=df1$Catholic))+
+  stat_qq()+
+  stat_qq_line(color="red")+
+  theme_classic()+
+  ggtitle("Q-Q-Plot Catholic")+
+  labs(x= "Theoretical Quantiles", y = "Sample Quantiles")+
+  scale_y_continuous(breaks=c(0,20,40,60,80,100))+
+  theme(plot.title = element_text(hjust = 0.5))
+cat_qq
+
+cat_ecdf <- ggplot(df1, aes(df1$Catholic))+
+  stat_ecdf(geom = "step")+
+    theme_classic()+
+  ggtitle("ECDF Catholic")+
+  labs(x= "Catholics (%)", y = "Frequency")+
+  scale_x_continuous(limits=c(0,100,by=10))+
+  theme(plot.title = element_text(hjust = 0.5))
+cat_ecdf
+
+cat_violin <- ggplot(df1, aes(x = 1, y = df1$Catholic))+
+  geom_violin(trim = FALSE, fill = "lightgrey", width = 1)+
+  geom_boxplot(width = 0.1)+
+  theme_classic()+
+  ggtitle("Violinplot Catholic")+
+  labs(x= "y", y = "Catholics (%)")+
+  coord_flip()+
+  scale_y_continuous(limits=c(0,100,by=10))+
+  theme(plot.title = element_text(hjust = 0.5), axis.title.y = element_text(size = 30, color="white"), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+cat_violin
+
+library(gridExtra)
+png("cat_plots.png", width = 6, height =7, units ='in', res = 900)
+cat_plots <- grid.arrange(cat_hist, cat_box, cat_qq, cat_violin, cat_ecdf, nrow=3)
+dev.off()
+```
+
+
+
+\includegraphics{cat_plots.png}
+
+```{r catholic stats, include=FALSE, message=FALSE, warning=FALSE}
+library(psych)
+mean(swiss[,5])
+median(swiss[,5])
+sd(swiss[,5])
+IQR(swiss[,5])
+skew(swiss[,5])
+kurtosi(swiss[,5])
+shapiro.test(df1$Catholic)
+```
+
+Die Lageschätzer Mittelwert `r options(digits=3);mean(swiss[,5])` % und Median `r options(digits=3);median(swiss[,5])` % der Education Variable zeigen, dass der arithmetische Mittelwert hier ein unpassender Schätzwert ist, da die Daten wie in Histogramm und Violinplot ersichtlich, multimodal sind. Die S-Kurve im Q-Q-Plot und die im Zentrum abgeflachte Kurve im ECDF Plot deuten ebenfalls auf Bi- bzw. Multimodalität der Daten hin. Boxplots sind in diesem Fall nicht hilfreich, da sie die Multimodalität der Daten verbergen, was die stark in die Länge gezogene Box verdeutlicht. Das Gewicht in den Rändern bzw. die Exzess-Kurtosis liegt mit `r options(digits=3);kurtosi(swiss[,5])` im negativen Bereich, jedoch ist dieser Wert hier aufgrund der Datenverteilung nicht besonders sinnvoll. Die Schiefe bzw. Skewness der Daten liegt mit `r options(digits=3);skew(swiss[,5])` innerhalb der als Richtwert angenommenen Schiefe zwischen -0,5 und 0,5, was darauf hinweist, dass es sich trotz multimodalität um eher **symmetrisch angesiedelte** Daten handelt. Histogramm und Violinplot deuten dies ebenfalls an, wobei es sich eindeutig nicht um eine perfekte Symmetrie handelt, worauf auch die Lokation des Medians (`r options(digits=3);median(swiss[,5])` %) hinweist. 
+
+Aufgrund der Multimodalität der Daten sind die Schätzung von Lage- und Skalenmaßen sowie auch die Durchführung des Shapiro-Wilk Tests auf Normalverteilung hier nicht sinnvoll. In den Grafiken ist eindeutig ersichtlich, dass die Daten **nicht normalverteilt** sind.  
+
+\pagebreak
+## 2.1.6 Infant Mortality
+
+Die in der Variable "Infant.Mortality" enthaltenen Werte repräsentieren den Säuglingstod in Prozent, also jene Säuglinge, die zwar lebend geboren wurden aber innerhalb des ersten Lebensjahres verstarben. Die Verteilung der Werte kann beispielsweise folgendermaßen grafisch dargestellt werden:
+
+```{r infmortality_plots, include=FALSE, message=FALSE, warning=FALSE}
+help(swiss)
+df1 <- as.data.frame(swiss[,1:6])
+inf_hist <- ggplot(df1, aes(x = `Infant.Mortality`, y= after_stat(density)))+
+  geom_histogram(color="black", fill="lightgrey", breaks = seq(0, 40, by = 2))+
+  geom_density(color = "red")+
+  theme_classic()+
+  ggtitle("Histogram Infant Mortality")+
+  labs(x= "Infant Mortality (%)", y = "Density")+
+  scale_x_continuous(breaks=seq(0,40,by=5))+ 
+ # scale_y_continuous(breaks=seq(0.00,0.02,by=0.01))+
+  theme(plot.title = element_text(hjust = 0.5))
+inf_hist
+
+inf_box <- ggplot(df1, aes(x = `Infant.Mortality`))+
+  geom_boxplot(color="black", fill="lightgrey", width = 2)+
+  theme_classic()+
+  ggtitle("Boxplot Infant Mortality")+
+  labs(x= "Infant Mortality (%)", y = "y")+
+  scale_x_continuous(breaks=seq(0,40,by=5))+
+  theme(plot.title = element_text(hjust = 0.5),  axis.title.y = element_text(size = 30, color="white"), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+inf_box
+
+inf_qq <- ggplot(df1, aes(sample=df1$Infant.Mortality))+
+  stat_qq()+
+  stat_qq_line(color="red")+
+  theme_classic()+
+  ggtitle("Q-Q-Plot Infant Mortality")+
+  labs(x= "Theoretical Quantiles", y = "Sample Quantiles")+
+  scale_y_continuous(breaks=c(0,10,20,30,40))+
+  theme(plot.title = element_text(hjust = 0.5))
+inf_qq
+
+inf_ecdf <- ggplot(df1, aes(df1$Infant.Mortality))+
+  stat_ecdf(geom = "step")+
+    theme_classic()+
+  ggtitle("ECDF Infant Mortality")+
+  labs(x= "Infant Mortality (%)", y = "Frequency")+
+  scale_x_continuous(limits=c(0,40,by=10))+
+  theme(plot.title = element_text(hjust = 0.5))
+inf_ecdf
+
+inf_violin <- ggplot(df1, aes(x = 1, y = df1$Infant.Mortality))+
+  geom_violin(trim = FALSE, fill = "lightgrey", width = 1)+
+  geom_boxplot(width = 0.1)+
+  theme_classic()+
+  ggtitle("Violinplot Infant Mortality")+
+  labs(x= "y", y = "Infant Mortality (%)")+
+  coord_flip()+
+  scale_y_continuous(limits=c(0,40,by=10))+
+  theme(plot.title = element_text(hjust = 0.5), axis.title.y = element_text(size = 30, color="white"), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+inf_violin
+
+library(gridExtra)
+png("inf_plots.png", width = 6, height =7, units ='in', res = 900)
+inf_plots <- grid.arrange(inf_hist, inf_box, inf_qq, inf_violin, inf_ecdf, nrow=3)
+dev.off()
+```
+
+\includegraphics{inf_plots.png}
+
+```{r infantmortality stats, include=FALSE, message=FALSE, warning=FALSE}
+library(psych)
+mean(swiss[,6])
+median(swiss[,6])
+sd(swiss[,6])
+IQR(swiss[,6])
+skew(swiss[,6])
+kurtosi(swiss[,6])
+shapiro.test(df1$Infant.Mortality)
+```
+
+Die Lageschätzer Mittelwert `r options(digits=3);mean(swiss[,6])` % und Median `r options(digits=3);median(swiss[,6])` % der Infant Mortality Variable sind beinahe gleich. Dies weist, zusammen mit der gemäß Histogramm und Violinplot eindeutig unimodalen Kurve, darauf hin, dass es sich um **symmetrische** und **normalverteilte** Daten handelt. Der Q-Q-Plot bestätigt dies. In Boxplots, Q-Q-Plot und dem ECDF Plot ist ein potentieller Ausreißer am linken Rand zu erkennen. Da sich durch die verbleibenden 46 Werte jedoch über 95 % der Daten erklären lassen und der Datensatz durch den jenseits des Minimums liegenden Einzelwert nicht großartig verzerrt wird, kann dieser toleriert werden. 
+
+Im Q-Q-Plot sind keine schweren Ränder zu erkennen und das Gewicht in den Rändern bzw. die Exzess-Kurtosis liegt mit `r options(digits=3);kurtosi(swiss[,1])` auch sehr nahe bei Null und ist daher der Normalverteilung sehr ähnlich. Die Schiefe bzw. Skewness der Daten beträgt `r options(digits=3);skew(swiss[,1])` und liegt somit innerhalb des Richtwertebereichs von -0,5 und 0,5, was die symmetrische Verteilung der Daten bestätigt.
+
+```{r infantmortality stats2, comment=">", include=TRUE, message=FALSE, warning=FALSE}
+shapiro.test(swiss$Infant.Mortality)
+```
+
+Insgesamt kann aufgrund der genannten Beobachtungen von einer Normalverteiliung ausgegangen werden. Der zusätzlich zur explorativen Datenanlyse durchgeführte Shapiro-Wilk Test bekräftigt dies mit einem p-Wert > 0.05. Daher können **das arithmetische Mittel (`r options(digits=3);mean(swiss[,6])` %)** und **die Standardabweichung (`r options(digits=3);sd(swiss[,6])` %)** als Lage- und Variationsmaße für die Variable Infant Mortality herangezogen werden. 
+
+Robustere Maße wären im Vergleich dazu der oben genannte Median (`r options(digits=3);median(swiss[,6])` %), der MAD des Medians (`r options(digits=3);mad(swiss[,6])` %), oder auch die Interquartilsdistanz (`r IQR(swiss[,6])` %).
+
+\pagebreak
+## 2.1.7 Zusammenhänge zwischen den Variablen
+
+Zuletzt wurden die Zusammenhänge zwischen den Variablen Fertility, Agriculture, Education, Catholic und Infant Mortality in Scatterplot Matrizen dargestellt, welche veranschaulichen sollen, wie sich die Werte zweier Variablen zueinander verhalten. In der einfachsten Form sieht dies so aus:
+
+```{r scatter1, echo=FALSE, warning=FALSE, fig.height=9, fig.width=9, fig.align='center'}
+df2=swiss[-3]
+plot(df2)
+```
+
+In der obigen Scatterplot Matrix macht sich beispielsweise die Multimodalität der Catholic-Variable im Vergleich zu den anderen Variablen durch jeweils zwei mehr oder weniger stark ausgeprägte Datencluster bemerkbar. Abgesehen davon, deuten einige Datenwolken eine Richtung und somit einen möglichen Zusammenhang an. 
+
+Um mögliche Zusammenhänge bzw. Korrelationen zu visualisieren, wurde in den nachfolgenden beiden Grafiken auch die Regressionsgerade (in Dunkelrot) und der Pearson Korrelationskoeffizient R (in Orange) oder R² (in Dunkelgrün) dargestellt:
+
+```{r scatter2, echo=FALSE, warning=FALSE, fig.height=9, fig.width=9, fig.align='center'}
+df2=swiss[-3]
+
+upper_panel_regression_line = function(x,y, ...){
+  points(x,y,...)
+  linear_regression = lm(y~x)
+  linear_regression_line = abline(linear_regression, col="darkred")
+}
+
+#A function to calculate and show the R-squared value of each panel
+lower_panel_r = function(x, y, ...){
+  usr <- par("usr"); on.exit(par(usr))
+  par(usr = c(0, 2, 0, 2))
+  r = cor(x, y)
+  r_print = round(r, digits = 2)
+  text_of_r = paste0("R = ", r_print)
+  text(1, 1,cex=1.5, text_of_r, col="darkorange")
+}
+
+pairs(df2, main = "Swiss Scatterplot Matrix with Correlation Coefficients (R)", 
+lower.panel=lower_panel_r, upper.panel = 
+        upper_panel_regression_line)
+```
+Je nach Forschungsdisziplin werden unterschiedliche R und R² Werte als sinnvoll erachtet. Laut der Internetressource *https://condor.depaul.edu/sjost/it223/documents/correlation.htm* deutet in den Social Sciences beispielsweise ein Korrelationskoeffizient R < -0.6 oder R > 0.6 darauf hin, dass zwei Variablen miteinander korrelieren. Im gegenständlichen Datensatz scheinen demnach mit einem Korrelationskoeffizienten R von `r cor(swiss$Agriculture, swiss$Education)` die Variablen **Agriculture und Education**, sowie mit einem Korrelationskoeffizienten R von `r cor(swiss$Fertility, swiss$Education)` auch **Fertility und Education** negativ miteinander zu korrelieren. Dies könnte darauf hinweisen, dass in Schweizer Provinzen mit höherem Bildungsgrad um 1888 die Geburtenrate niedriger war als in Provinzen, wo die Testbevölkerung weniger hohe Bildungslevel inne hatte. Eine Korrelation zwischen Infant Mortality und Fertility, die man im Zuge des demographischen Wandels der Schweiz erwarten könnte, ist in diesem Datensatz auf den ersten Blick jedoch noch nicht erkennbar.
+
+Zudem gilt ein R² > 0.35 laut oben genannter Quelle als aussagekräftig. R² misst den Anteil der Variation in der abhängigen Variable, der der unabhängigen Variable zugeschrieben werden kann. Wie in nachfolgender Grafik ersichtlich, trifft dies ebenso auf die Variablen **Agriculture und Education** sowie **Fertility und Education** zu:
+
+```{r scatter3, echo=FALSE, warning=FALSE, fig.height=9, fig.width=9, fig.align='center'}
+df2=swiss[-3]
+
+upper_panel_regression_line = function(x,y, ...){
+  points(x,y,...)
+  linear_regression = lm(y~x)
+  linear_regression_line = abline(linear_regression, col="darkred")
+}
+
+#A function to calculate and show the R-squared value of each panel
+lower_panel_r_squared = function(x, y, ...){
+  usr <- par("usr"); on.exit(par(usr))
+  par(usr = c(0, 2, 0, 2))
+  r = cor(x, y)
+  r_squared = round(r^2, digits = 2)
+  text_of_r_squared = paste0("R² = ", r_squared)
+  text(1, 1,cex=1.5, text_of_r_squared, col="darkgreen")
+}
+
+pairs(df2, main = "Swiss Scatterplot Matrix with Coefficients of Determination (R²)", 
+lower.panel=lower_panel_r_squared, upper.panel = 
+        upper_panel_regression_line)
+```
+\pagebreak
+
+# Beispiel 2.2
+
+## 2.2.1 Übersicht über den Datensatz "state.x77"
+
+Die Datenmatrix "state.x77" ist Teil einer vom U.S. Department of Commerce zur Verfügung gestellten Reihe von Datensätzen mit dem Thema "US State Facts and Figures" und beinhaltet Messungen nachfolgender 8 Indikatoren aus den 50 amerikanischen Bundesstaaten:
+
+- Population (Schätzung der Bevölkerungsanzahl zum 1. Juli 1975)
+- Income (Pro-Kopf-Einkommen in 1974, in $)
+- Illiteracy (Analphabetismus in 1970, in %)
+- Life Exp (Lebenserwartung in Jahren von 1969-71)
+- Murder (Mord und nicht-fahrlässige Tötungsrate pro 100.000 Einwohner in 1976)
+- HS Grad (Personen mit High School Abschluss in 1970, in %)
+- Frost (durchschnittliche Anzahl von Tagen an denen die Mindesttemperatur von 1931-1960 in einer Haupt- oder Großstadt unter dem Gefrierpunkt lag)
+- Area (Landfläche in Quadratmeilen, mi²; nicht Teil der Aufgabenstellung)
+
+Es folgt ein kleiner Einblick in den Datensatz, sowie eine Übersicht über Minima, Maxima, Mittelwerte, Mediane und die 1. und 3. Quantilwerte aller Variablen: 
+
+```{r state stats1, comment=">"}
+help(state.x77)
+head(state.x77, n=5)
+summary(state.x77)
+```
+Der Datensatz besteht aus insgesamt 8 Variablen mit 50 Einträgen (ein Eintrag pro Bundesstaat) im numerischen Datentyp.
+```{r state stats2, include=FALSE, message=FALSE, warning=FALSE}
+str(state.x77)
+```
+\pagebreak
+
+## 2.2.2 Population
+Die in der Variable "Population" enthaltenen Werte spiegeln die geschätzte Bevölkerungsanzahl im Juli 1975 pro US-Bundesstaat wider. Die Verteilung der Werte kann beispielsweise folgendermaßen grafisch dargestellt werden:
+
+```{r pop_plots, include=FALSE, message=FALSE, warning=FALSE}
+library(ggplot2)
+
+df3 <- as.data.frame(state.x77[,1:8])
+pop_hist <- ggplot(df3, aes(x = `Population`, y= after_stat(density)))+
+  geom_histogram(color="black", fill="lightgrey", breaks = seq(0, 23000, by = 1000))+
+  geom_density(color = "red")+
+  theme_classic()+
+  ggtitle("Histogram Population")+
+  labs(x= "Population", y = "Density")+
+  scale_x_continuous(breaks=seq(0,23000,by=5000))+
+  theme(plot.title = element_text(hjust = 0.5))
+pop_hist
+
+pop_box <- ggplot(df3, aes(x = `Population`))+
+  geom_boxplot(color="black", fill="lightgrey", width = 2)+
+  theme_classic()+
+  ggtitle("Boxplot Population")+
+  labs(x= "Population", y = "y")+
+  scale_x_continuous(breaks=seq(0,23000,by=5000))+
+  theme(plot.title = element_text(hjust = 0.5),  axis.title.y = element_text(size = 30, color="white"), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+pop_box
+
+pop_qq <- ggplot(df3, aes(sample=df3$Population))+
+  stat_qq()+
+  stat_qq_line(color="red")+
+  theme_classic()+
+  ggtitle("Q-Q-Plot Population")+
+  labs(x= "Theoretical Quantiles", y = "Sample Quantiles")+
+  scale_y_continuous(breaks=c(0,5000,10000,15000,20000,23000))+
+  theme(plot.title = element_text(hjust = 0.5))
+pop_qq
+
+pop_ecdf <- ggplot(df3, aes(df3$Population))+
+  stat_ecdf(geom = "step")+
+    theme_classic()+
+  ggtitle("ECDF Population")+
+  labs(x= "Population", y = "Frequency")+
+  scale_x_continuous(breaks=c(0,5000,10000,15000,20000,23000))+
+  theme(plot.title = element_text(hjust = 0.5))
+pop_ecdf
+
+pop_violin <- ggplot(df3, aes(x = 1, y = df3$Population))+
+  geom_violin(trim = FALSE, fill = "lightgrey", width = 1)+
+  geom_boxplot(width = 0.1)+
+  theme_classic()+
+  ggtitle("Violinplot Population")+
+  labs(x= "y", y = "Population")+
+  coord_flip()+
+  scale_y_continuous(limits=c(0,23000,by=5000))+
+  theme(plot.title = element_text(hjust = 0.5), axis.title.y = element_text(size = 30, color="white"), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+pop_violin
+
+library(gridExtra)
+png("pop_plots.png", width = 6, height = 7, units ='in', res = 900)
+pop_plots <- grid.arrange(pop_hist, pop_box, pop_qq, pop_violin, pop_ecdf, nrow=3)
+dev.off()
+```
+
+\includegraphics{pop_plots.png}
+
+Der arithmetische Mittelwert `r options(digits=3);mean(df3[,1])` und Median `r options(digits=3);median(df3[,1])` liegen weit auseinander, was darauf hindeutet, dass die Daten asymmetrisch verteilt sind. Passend dazu zeigt die grafische Darstellung der Verteilung der Populationsdaten in Histogramm, Boxplot und Violinplot, dass die Daten zwar unimodal, aber stark rechtsschief angesiedelt sind. In den Boxplots und dem ECDF Plot sind mehrere potentielle Ausreißer am rechten Rand zu erkennen. Die Verteilung der Datenpunkte im Q-Q-Plot zeigt einen leichten linken und einen schweren rechten Rand, was bedeutet, dass die Daten nicht der Normalverteilung entsprechen. Das Gewicht in den Rändern bzw. die Exzess-Kurtosis liegt mit `r options(digits=3);kurtosi(df3[,1])` deutlich im positiven Bereich, was im Vergleich zur Normalverteilung (wo Exzess-Kurtosis = 0) ebenfalls auf schwere Ränder und auf das mögliche Vorhandensein von Ausreißern hindeutet. Die Schiefe bzw. Skewness der Daten liegt bei `r options(digits=3);skew(df3[,1])`. Die Datenverteilung ist somit eindeutig **asymmetrisch**. 
+
+```{r pop_stats2, comment=">", include=TRUE, message=FALSE, warning=FALSE}
+shapiro.test(df3[,1])
+```
+
+Insgesamt kann daher nicht von einer Normalverteiliung ausgegangen werden. Der zusätzlich zur exploriativen Datenanlyse durchgeführte Shapiro-Wilk Test bekräftigt dies mit einem p-Wert < 0.05. Aufgrund der Verteilung können der robuste **Median `r options(digits=3);median(df3[,1])` Personen** und die **MAD des Medians `r options(digits=3);mad(df3[,1])` Personen** als Lage- und Variationsmaße für die Variable Population herangezogen werden. Die Interquartilsdistanz beträgt `r options(digits=3);IQR(df3[,1])`.
+
+Weniger robuste Maße wären im Vergleich dazu der oben genannte arithmetische Mittelwert (`r options(digits=1);mean(df3[,1])` Personen) und die Standardabweichung (`r options(digits=1);sd(df3[,1])` Personen). Da die Daten nicht normalverteilt sind, ist die Verwendung dieser beiden Werte hier allerdings nicht sinnvoll.
+
+```{r pop stats, include=FALSE, message=FALSE, warning=FALSE}
+library(psych)
+mean(df3[,1])
+median(df3[,1])
+mad(df3[,1])
+sd(df3[,1])
+IQR(df3[,1])
+skew(df3[,1])
+kurtosi(df3[,1])
+shapiro.test(df3[,1])
+```
+
+\pagebreak
+
+## 2.2.3 Income
+Die in der Variable "Income" enthaltenen Werte spiegeln das Einkommen pro Kopf in USD ($) im Jahr 1974 aufgeschlüsselt nach US-Bundesstaat wider. Die Verteilung der Werte kann beispielsweise folgendermaßen grafisch dargestellt werden:
+
+```{r income_plots, include=FALSE, message=FALSE, warning=FALSE}
+help(state.x77)
+
+inc_hist <- ggplot(df3, aes(x = `Income`, y= after_stat(density)))+
+  geom_histogram(color="black", fill="lightgrey", breaks = seq(3000, 6500, by = 250))+
+  geom_density(color = "red")+
+  theme_classic()+
+  ggtitle("Histogram Income")+
+  labs(x= "Income ($)", y = "Density")+
+  scale_x_continuous(breaks=seq(3000,6500,by=1000))+
+  theme(plot.title = element_text(hjust = 0.5))
+inc_hist
+
+inc_box <- ggplot(df3, aes(x = `Income`))+
+  geom_boxplot(color="black", fill="lightgrey", width = 2)+
+  theme_classic()+
+  ggtitle("Boxplot Income")+
+  labs(x= "Income ($)", y = "y")+
+  scale_x_continuous(breaks=seq(3000,6500,by=1000))+
+  theme(plot.title = element_text(hjust = 0.5),  axis.title.y = element_text(size = 30, color="white"), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+inc_box
+
+inc_qq <- ggplot(df3, aes(sample=df3$Income))+
+  stat_qq()+
+  stat_qq_line(color="red")+
+  theme_classic()+
+  ggtitle("Q-Q-Plot Income")+
+  labs(x= "Theoretical Quantiles", y = "Sample Quantiles")+
+  scale_y_continuous(breaks=c(3000,4000,5000,6000,6500))+
+  theme(plot.title = element_text(hjust = 0.5))
+inc_qq
+
+inc_ecdf <- ggplot(df3, aes(df3$Income))+
+  stat_ecdf(geom = "step")+
+    theme_classic()+
+  ggtitle("ECDF Income")+
+  labs(x= "Income ($)", y = "Frequency")+
+  scale_x_continuous(breaks=c(3000,4000,5000,6000,6500))+
+  theme(plot.title = element_text(hjust = 0.5))
+inc_ecdf
+
+inc_violin <- ggplot(df3, aes(x = 1, y = df3$Income))+
+  geom_violin(trim = FALSE, fill = "lightgrey", width = 1)+
+  geom_boxplot(width = 0.1)+
+  theme_classic()+
+  ggtitle("Violinplot Income")+
+  labs(x= "y", y = "Income ($)")+
+  coord_flip()+
+  scale_y_continuous(limits=c(3000,6500,by=500))+
+  theme(plot.title = element_text(hjust = 0.5), axis.title.y = element_text(size = 30, color="white"), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+inc_violin
+
+library(gridExtra)
+png("inc_plots.png", width = 6, height = 7, units ='in', res = 900)
+inc_plots <- grid.arrange(inc_hist, inc_box, inc_qq, inc_violin, inc_ecdf, nrow=3)
+dev.off()
+```
+
+\includegraphics{inc_plots.png}
+
+```{r income stats, include=FALSE, message=FALSE, warning=FALSE}
+library(psych)
+mean(df3[,2])
+median(df3[,2])
+mad(df3[,2])
+sd(df3[,2])
+IQR(df3[,2])
+skew(df3[,2])
+kurtosi(df3[,2])
+shapiro.test(df3[,2])
+```
+
+Der arithmetische Mittelwert `r options(digits=3);mean(df3[,2])` $ und Median `r options(digits=3);median(df3[,2])` $ liegen relativ nahe beieinander. Die grafische Darstellung der Verteilung der Populationsdaten in Histogramm, Boxplot und Violinplot zeigt, dass die Daten eher unimodal sind. In den Boxplots, im Q-Q-Plot und ECDF Plot ist ein potentieller Ausreißer am rechten Rand zu erkennen. Abgesehen von diesem einzelnen Punkt liegen die Daten im Q-Q-Plot aber auf oder sehr nahe an der roten Linie, was bedeutet, dass die Daten normal verteilt sind. Das Gewicht in den Rändern bzw. die Exzess-Kurtosis liegt mit `r options(digits=3);kurtosi(df3[,2])` im leicht positiven Bereich, was möglicherweise ein Effekt des Ausreißers am rechten Rand ist. Die Schiefe bzw. Skewness der Daten liegt bei `r options(digits=3);skew(df3[,2])`, also innerhalb der -0,5 bis 0,5 Spanne in der sich symmetrische Daten bewegen. Die Datenverteilung kann daher als **symmetrisch** bezeichnet werden. 
+
+```{r income_stats2, comment=">", include=TRUE, message=FALSE, warning=FALSE}
+shapiro.test(df3[,2])
+```
+
+Insgesamt kann aufgrund dieser Beobachtungen von einer Normalverteiliung ausgegangen werden. Der zusätzlich zur exploriativen Datenanlyse durchgeführte Shapiro-Wilk Test bekräftigt dies mit einem p-Wert > 0.05. Aufgrund der approximativen Normalverteilung können als Lage- und Variationsmaße der **arithmetische Mittelwert (`r options(digits=3);mean(df3[,2])` $)** und die **Standardabweichung (`r options(digits=3);sd(df3[,2])` $)** herangezogen werden.
+
+Im Vergleich stehen auch der robustere Median `r options(digits=3);median(df3[,2])` $ und die MAD des Medians `r options(digits=3);mad(df3[,2])` $ als Lage- und Variationsmaße zur Verfügung. Die Interquartilsdistanz beträgt `r options(digits=3);IQR(df3[,2])`.
+
+\pagebreak
+
+## 2.2.4 Illiteracy
+Die in der Variable "Illiteracy" enthaltenen Werte spiegeln das Analphabetismus-Level in Prozent im Jahr 1970 aufgeschlüsselt nach US-Bundesstaaten wider. Die Verteilung der Werte kann beispielsweise folgendermaßen grafisch dargestellt werden:
+
+```{r illiteracy_plots, include=FALSE, message=FALSE, warning=FALSE}
+help(state.x77)
+library(ggplot2)
+illi_hist <- ggplot(df3, aes(x = `Illiteracy`, y= after_stat(density)))+
+  geom_histogram(color="black", fill="lightgrey", breaks = seq(0, 3, by = 0.25))+
+  geom_density(color = "red")+
+  theme_classic()+
+  ggtitle("Histogram Illiteracy")+
+  labs(x= "Illiteracy (%)", y = "Density")+
+  scale_x_continuous(breaks=seq(0,3,by=0.5))+
+  theme(plot.title = element_text(hjust = 0.5))
+illi_hist
+
+illi_box <- ggplot(df3, aes(x = `Illiteracy`))+
+  geom_boxplot(color="black", fill="lightgrey", width = 2)+
+  theme_classic()+
+  ggtitle("Boxplot Illiteracy")+
+  labs(x= "Illiteracy (%)", y = "y")+
+  scale_x_continuous(breaks=seq(0, 3,by=0.5))+
+  theme(plot.title = element_text(hjust = 0.5),  axis.title.y = element_text(size = 30, color="white"), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+illi_box
+
+illi_qq <- ggplot(df3, aes(sample=df3$Illiteracy))+
+  stat_qq()+
+  stat_qq_line(color="red")+
+  theme_classic()+
+  ggtitle("Q-Q-Plot Illiteracy")+
+  labs(x= "Theoretical Quantiles", y = "Sample Quantiles")+
+  scale_y_continuous(breaks=c(0,0.5,1,1.5,2,2.5,3))+
+  theme(plot.title = element_text(hjust = 0.5))
+illi_qq
+
+illi_ecdf <- ggplot(df3, aes(df3$Illiteracy))+
+  stat_ecdf(geom = "step")+
+    theme_classic()+
+  ggtitle("ECDF Illiteracy")+
+  labs(x= "Illiteracy (%)", y = "Frequency")+
+  scale_x_continuous(breaks=c(0,0.5,1,1.5,2,2.5,3))+
+  theme(plot.title = element_text(hjust = 0.5))
+illi_ecdf
+
+illi_violin <- ggplot(df3, aes(x = 1, y = df3$Illiteracy))+
+  geom_violin(trim = FALSE, fill = "lightgrey", width = 1)+
+  geom_boxplot(width = 0.1)+
+  theme_classic()+
+  ggtitle("Violinplot Illiteracy")+
+  labs(x= "y", y = "Illiteracy (%)")+
+  coord_flip()+
+  scale_y_continuous(limits=c(0,3,by=0.5))+
+  theme(plot.title = element_text(hjust = 0.5), axis.title.y = element_text(size = 30, color="white"), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+illi_violin
+
+library(gridExtra)
+png("illi_plots.png", width = 6, height = 7, units ='in', res = 900)
+illi_plots <- grid.arrange(illi_hist, illi_box, illi_qq, illi_violin, illi_ecdf, nrow=3)
+dev.off()
+```
+
+\includegraphics{illi_plots.png}
+
+```{r illiteracy stats, include=FALSE, message=FALSE, warning=FALSE}
+library(psych)
+mean(df3[,3])
+median(df3[,3])
+mad(df3[,3])
+sd(df3[,3])
+IQR(df3[,3])
+skew(df3[,3])
+kurtosi(df3[,3])
+shapiro.test(df3[,3])
+min(df3[,3])
+max(df3[,3])
+```
+
+Die Analphabetismus-Daten aus den verschiedenen Bundesstaaten weisen eine unimodale, stark rechtsschiefe Verteilung auf, wie im Histogramm gut zu erkennen ist. Es besteht ein deutlicher Unterschied zwischen dem arithmetischen Mittelwert `r options(digits=3);mean(df3[,3])` % und dem Median `r options(digits=3);median(df3[,3])` %, wenn man bedenkt, dass sich die Daten zwischen `r options(digits=3);min(df3[,3])` % (Minimum) und `r options(digits=3);max(df3[,3])` % (Maximum) bewegen. Der Mittelwert zeigt hier ebenfalls, dass die Datenverteilung nach rechts verzerrt ist. In den Boxplots und dem ECDF Plot sind keine eindeutigen Ausreißer zu erkennen.
+
+Der Q-Q-Plot zeigt, dass die Verteilung der Daten im Zentrum und rechts einer Normalverteilung entspricht, wobei links ein eindeutiger leichter Rand zu erkennen ist. Das Gewicht in den Rändern bzw. die Exzess-Kurtosis liegt mit `r options(digits=3);kurtosi(df3[,3])` im negativen Bereich, was ebenfalls auf leichte Ränder und einen niedrigeren Peak hindeutet, als bei einer Normalverteilung erwartet. Die Schiefe bzw. Skewness der Daten liegt bei `r options(digits=3);skew(df3[,3])`, also außerhalb der -0,5 bis 0,5 Spanne in der sich symmetrische Daten bewegen. Die Datenverteilung kann daher als **asymmetrisch** sowie **nicht normalverteilt** bezeichnet werden. Der zusätzlich zur exploriativen Datenanlyse durchgeführte Shapiro-Wilk Test bestätigt mit einem p-Wert < 0.05, dass die Daten nicht normalverteilt sind. 
+
+```{r illi_stats2, comment=">", include=TRUE, message=FALSE, warning=FALSE}
+shapiro.test(df3[,3])
+```
+
+Aufgrund der Verteilung der Analphabetismus-Daten können als sinnvolle Lage- und Variationsmaße der **Median `r options(digits=3);median(df3[,3])` %** und die **MAD des Medians `r options(digits=3);mad(df3[,3])` %** verwendet werden. Die Interquartilsdistanz beträgt `r options(digits=3);IQR(df3[,3])`.
+
+Der hier nicht empfehlenswerte arithmetische Mittelwert beträgt im Vergleich dazu `r options(digits=3);mean(df3[,3])` % und die Standardabweichung `r options(digits=3);sd(df3[,3])` %.
+
+\pagebreak
+
+## 2.2.5 Life Expectancy
+Die in der Variable "Life Exp" enthaltenen Werte spiegeln die Lebenserwartung in Jahren im Zeitraum 1969-1971 aufgeschlüsselt nach US-Bundesstaaten wider. Die Verteilung der Werte kann beispielsweise folgendermaßen grafisch dargestellt werden:
+
+```{r lifexp_plots, include=FALSE, message=FALSE, warning=FALSE}
+help(state.x77)
+
+lif_hist <- ggplot(df3, aes(x = `Life Exp`, y= after_stat(density)))+
+  geom_histogram(color="black", fill="lightgrey", breaks = seq(65, 75, by = 0.5))+
+  geom_density(color = "red")+
+  theme_classic()+
+  ggtitle("Histogram Life Expectancy")+
+  labs(x= "Life Expectancy (years)", y = "Density")+
+  scale_x_continuous(breaks=seq(65,75,by=2))+
+  theme(plot.title = element_text(hjust = 0.5))
+lif_hist
+
+lif_box <- ggplot(df3, aes(x = `Life Exp`))+
+  geom_boxplot(color="black", fill="lightgrey", width = 2)+
+  theme_classic()+
+  ggtitle("Boxplot Life Expectancy")+
+  labs(x= "Life Expectancy (years)", y = "y")+
+  scale_x_continuous(breaks=seq(65,75,by=2))+
+  theme(plot.title = element_text(hjust = 0.5),  axis.title.y = element_text(size = 30, color="white"), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+lif_box
+
+lif_qq <- ggplot(df3, aes(sample=df3$`Life Exp`))+
+  stat_qq()+
+  stat_qq_line(color="red")+
+  theme_classic()+
+  ggtitle("Q-Q-Plot Life Expectancy")+
+  labs(x= "Theoretical Quantiles", y = "Sample Quantiles")+
+  scale_y_continuous(breaks=c(68,70,72,74))+
+  theme(plot.title = element_text(hjust = 0.5))
+lif_qq
+
+lif_ecdf <- ggplot(df3, aes(df3$`Life Exp`))+
+  stat_ecdf(geom = "step")+
+    theme_classic()+
+  ggtitle("ECDF Life Expectancy")+
+  labs(x= "Life Expectancy (years)", y = "Frequency")+
+  scale_x_continuous(breaks=c(68,70,72,74))+
+  theme(plot.title = element_text(hjust = 0.5))
+lif_ecdf
+
+lif_violin <- ggplot(df3, aes(x = 1, y = df3$`Life Exp`))+
+  geom_violin(trim = FALSE, fill = "lightgrey", width = 1)+
+  geom_boxplot(width = 0.1)+
+  theme_classic()+
+  ggtitle("Violinplot Life Expectancy")+
+  labs(x= "y", y = "Life Expectancy (years)")+
+  coord_flip()+
+  scale_y_continuous(limits=c(65,75,by=2))+
+  theme(plot.title = element_text(hjust = 0.5), axis.title.y = element_text(size = 30, color="white"), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+lif_violin
+
+library(gridExtra)
+png("lif_plots.png", width = 6, height = 7, units ='in', res = 900)
+lif_plots <- grid.arrange(lif_hist, lif_box, lif_qq, lif_violin, lif_ecdf, nrow=3)
+dev.off()
+```
+
+\includegraphics{lif_plots.png}
+
+```{r lifexpectancy stats, include=FALSE, message=FALSE, warning=FALSE}
+library(psych)
+mean(df3[,4])
+median(df3[,4])
+mad(df3[,4])
+sd(df3[,4])
+IQR(df3[,4])
+skew(df3[,4])
+kurtosi(df3[,4])
+shapiro.test(df3[,4])
+```
+
+Der arithmetische Mittelwert `r options(digits=3);mean(df3[,4])` der Lebenserwartung in Jahren und der Median `r options(digits=3);median(df3[,4])` Jahre liegen relativ nahe beieinander. Die grafische Darstellung der Life Expectancy Daten in Histogramm, Boxplot und Violinplot zeigt, dass die Daten unimodal sind keine offensichtlichen Ausreißer beinhalten. Abgesehen von wenigen einzelnen Punkten liegen die Daten im Q-Q-Plot auf oder sehr nahe an der roten Linie, was darauf hindedeutet, dass sie **normalverteilt** sind. Das Gewicht in den Rändern bzw. die Exzess-Kurtosis liegt mit `r options(digits=3);kurtosi(df3[,4])` im negativen Bereich, was auf einen leicht abgeflachten Peak im Vergleich zur Normalverteilung hindeutet. Die Schiefe bzw. Skewness der Daten liegt bei `r options(digits=3);skew(df3[,4])`, also innerhalb der -0,5 bis 0,5 Spanne in der sich symmetrische Daten bewegen. Die Datenverteilung kann daher als **symmetrisch** bezeichnet werden. 
+
+```{r lifexp_stats2, comment=">", include=TRUE, message=FALSE, warning=FALSE}
+shapiro.test(df3[,4])
+```
+
+Insgesamt kann aufgrund dieser Beobachtungen von einer Normalverteiliung ausgegangen werden. Der zusätzlich zur explorativen Datenanlyse durchgeführte Shapiro-Wilk Test bekräftigt dies mit einem p-Wert > 0.05. Aufgrund der approximativen Normalverteilung können als Lage- und Variationsmaße der **arithmetische Mittelwert (`r options(digits=3);mean(df3[,4])` Jahre)** und die **Standardabweichung (`r options(digits=3);sd(df3[,4])` Jahre)** herangezogen werden..
+
+Im Vergleich dazu stehen auch der robustere Median `r options(digits=3);median(df3[,4])` Jahre Lebenserwartung und die MAD des Medians `r options(digits=3);mad(df3[,4])` Jahre als Lage- und Variationsmaße zur Verfügung. Die Interquartilsdistanz beträgt `r options(digits=3);IQR(df3[,4])`.
+
+\pagebreak
+
+## 2.2.6 Murder
+Die in der Variable "Murder" enthaltenen Werte spiegeln die Mord- und nicht-fahrlässige Tötungsrate pro 100.000 Einwohnern im Jahr 1976 aufgeschlüsselt nach US-Bundesstaaten wider. Die Verteilung der Werte kann beispielsweise folgendermaßen grafisch dargestellt werden:
+
+```{r murder_plots, include=FALSE, message=FALSE, warning=FALSE}
+help(state.x77)
+
+mur_hist <- ggplot(df3, aes(x = `Murder`, y= after_stat(density)))+
+  geom_histogram(color="black", fill="lightgrey", breaks = seq(0, 16, by = 1))+
+  geom_density(color = "red")+
+  theme_classic()+
+  ggtitle("Histogram Murder Rate")+
+  labs(x= "Murder (per 100.000 people)", y = "Density")+
+  scale_x_continuous(breaks=seq(0,16,by=5))+
+  theme(plot.title = element_text(hjust = 0.5))
+mur_hist
+
+mur_box <- ggplot(df3, aes(x = `Murder`))+
+  geom_boxplot(color="black", fill="lightgrey", width = 2)+
+  theme_classic()+
+  ggtitle("Boxplot Murder Rate")+
+  labs(x= "Murder (per 100.000 people)", y = "y")+
+  scale_x_continuous(breaks=seq(0,16,by=4))+
+  theme(plot.title = element_text(hjust = 0.5),  axis.title.y = element_text(size = 30, color="white"), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+mur_box
+
+mur_qq <- ggplot(df3, aes(sample=df3$Murder))+
+  stat_qq()+
+  stat_qq_line(color="red")+
+  theme_classic()+
+  ggtitle("Q-Q-Plot Murder Rate")+
+  labs(x= "Theoretical Quantiles", y = "Sample Quantiles")+
+  scale_y_continuous(breaks=c(0,5,10,15))+
+  theme(plot.title = element_text(hjust = 0.5))
+mur_qq
+
+mur_ecdf <- ggplot(df3, aes(df3$Murder))+
+  stat_ecdf(geom = "step")+
+    theme_classic()+
+  ggtitle("ECDF Murder Rate")+
+  labs(x= "Murder Rate (per 100.000 people)", y = "Frequency")+
+  scale_x_continuous(breaks=c(0,5,10,15))+
+  theme(plot.title = element_text(hjust = 0.5))
+mur_ecdf
+
+mur_violin <- ggplot(df3, aes(x = 1, y = df3$Murder))+
+  geom_violin(trim = FALSE, fill = "lightgrey", width = 1)+
+  geom_boxplot(width = 0.1)+
+  theme_classic()+
+  ggtitle("Violinplot Murder Rate")+
+  labs(x= "y", y = "Murder (per 100.000 people)")+
+  coord_flip()+
+  scale_y_continuous(limits=c(0,16,by=4))+
+  theme(plot.title = element_text(hjust = 0.5), axis.title.y = element_text(size = 30, color="white"), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+mur_violin
+
+library(gridExtra)
+png("mur_plots.png", width = 6, height = 7, units ='in', res = 900)
+mur_plots <- grid.arrange(mur_hist, mur_box, mur_qq, mur_violin, mur_ecdf, nrow=3)
+dev.off()
+```
+
+\includegraphics{mur_plots.png}
+
+```{r murder stats, include=FALSE, message=FALSE, warning=FALSE}
+library(psych)
+help(state.x77)
+mean(df3[,5])
+median(df3[,5])
+mad(df3[,5])
+sd(df3[,5])
+IQR(df3[,5])
+skew(df3[,5])
+kurtosi(df3[,5])
+shapiro.test(df3[,5])
+```
+
+Der arithmetische Mittelwert (`r options(digits=3);mean(df3[,5])` Mordfälle pro 100.000 Einwohner) und der Median (`r options(digits=3);median(df3[,5])` Mordfälle pro 100.000 Einwohner) decken sich nicht. Histogramm, Violinplot, sowie die leichte S-Kurve im Q-Q-Plot und die abgeflachte Stelle in der Mitte des ECDF Plots zeigen, dass die Daten multi- beziehungsweise bimodal und somit **nicht normalverteilt** sind. Das Gewicht in den Rändern bzw. die Exzess-Kurtosis liegt mit `r options(digits=3);kurtosi(df3[,5])` im stark negativen Bereich, was auf einen abgeflachten Peak im Vergleich zur Normalverteilung hindeutet. Die Schiefe bzw. Skewness der Daten beträgt `r options(digits=3);skew(df3[,5])`, liegt also innerhalb der -0,5 bis 0,5 Spanne in der sich symmetrische Daten bewegen. Die Datenverteilung könnte zwar trotz der bimodalen Verteilung als **nahezu symmetrisch** bezeichnet werden, in Histogramm und Violinplot ist allerdings keine eindeutige Symmetrie zu erkennen. 
+
+Da der Shapiro-Wilk Test nur auf unimodale, eindimensionale Daten angewendet werden darf, ergibt dieser hier wenig Sinn. Aufgrund der Bimodalität sind die Murder-Daten nicht normalverteilt und eine Lageschätzung ist nicht sinnvoll.
+
+\pagebreak
+
+## 2.2.7 High School Graduation
+Die in der Variable "HS Grad" enthaltenen Werte spiegeln die Zahl der Einwohner in Prozent wider, die im Jahr 1970 aufgeschlüsselt nach US-Bundesstaat über einen High School Abschluss verfügten. Die Verteilung der Werte kann beispielsweise folgendermaßen grafisch dargestellt werden:
+
+```{r hsgrad_plots, include=FALSE, message=FALSE, warning=FALSE}
+help(state.x77)
+
+grad_hist <- ggplot(df3, aes(x = `HS Grad`, y= after_stat(density)))+
+  geom_histogram(color="black", fill="lightgrey", breaks = seq(35, 70, by = 2))+
+  geom_density(color = "red")+
+  theme_classic()+
+  ggtitle("Histogram HS Grad")+
+  labs(x= "High School Graduates (%)", y = "Density")+
+  scale_x_continuous(breaks=seq(35,70,by=10))+
+  theme(plot.title = element_text(hjust = 0.5))
+grad_hist
+
+grad_box <- ggplot(df3, aes(x = `HS Grad`))+
+  geom_boxplot(color="black", fill="lightgrey", width = 2)+
+  theme_classic()+
+  ggtitle("Boxplot HS Grad")+
+  labs(x= "High School Graduates (%)", y = "y")+
+  scale_x_continuous(breaks=seq(35,70,by=10))+
+  theme(plot.title = element_text(hjust = 0.5),  axis.title.y = element_text(size = 30, color="white"), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+grad_box
+
+grad_qq <- ggplot(df3, aes(sample=df3$`HS Grad`))+
+  stat_qq()+
+  stat_qq_line(color="red")+
+  theme_classic()+
+  ggtitle("Q-Q-Plot HS Grad")+
+  labs(x= "Theoretical Quantiles", y = "Sample Quantiles")+
+  scale_y_continuous(breaks=c(35, 40, 50, 60, 70))+
+  theme(plot.title = element_text(hjust = 0.5))
+grad_qq
+
+grad_ecdf <- ggplot(df3, aes(df3$`HS Grad`))+
+  stat_ecdf(geom = "step")+
+    theme_classic()+
+  ggtitle("ECDF HS Grad")+
+  labs(x= "High School Graduates (%)", y = "Frequency")+
+  scale_x_continuous(breaks=c(35, 40, 50, 60, 70))+
+  theme(plot.title = element_text(hjust = 0.5))
+grad_ecdf
+
+grad_violin <- ggplot(df3, aes(x = 1, y = df3$`HS Grad`))+
+  geom_violin(trim = FALSE, fill = "lightgrey", width = 1)+
+  geom_boxplot(width = 0.1)+
+  theme_classic()+
+  ggtitle("Violinplot HS Grad")+
+  labs(x= "y", y = "High School Graduates (%)")+
+  coord_flip()+
+  scale_y_continuous(limits=c(35,70,by=10))+
+  theme(plot.title = element_text(hjust = 0.5), axis.title.y = element_text(size = 30, color="white"), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+grad_violin
+
+library(gridExtra)
+png("grad_plots.png", width = 6, height = 7, units ='in', res = 900)
+grad_plots <- grid.arrange(grad_hist, grad_box, grad_qq, grad_violin, grad_ecdf, nrow=3)
+dev.off()
+```
+
+\includegraphics{grad_plots.png}
+
+```{r hsgraduation stats, include=FALSE, message=FALSE, warning=FALSE}
+library(psych)
+mean(df3[,6])
+median(df3[,6])
+mad(df3[,6])
+sd(df3[,6])
+IQR(df3[,6])
+skew(df3[,6])
+kurtosi(df3[,6])
+shapiro.test(df3[,6])
+```
+Auf den ersten Blick deuten Histogramm und Violinplot an, dass die High School Graduation Daten möglicherweise bimodal verteilt sein könnten. Ein Vergleich des arithmetischen Mittelwerts `r options(digits=3);mean(df3[,6])` % mit dem Median `r options(digits=3);median(df3[,6])`%, sowie auch der Vergleich zwischen Standardabweichung `r options(digits=3);sd(df3[,6])` % und MAD  `r options(digits=3);mad(df3[,6])`%, zeigt jedoch, dass die Werte sich jeweils sehr ähnlich sind. Es scheint daher, dass die Daten trotz des niedrigeren Peaks am linken Rand dennoch eher unimodal verteilt sind. Die Skewness von `r options(digits=3);skew(df3[,6])` legt nahe, dass die Daten trotz der ungleich wirkenden Verteilung in Summe **nahezu symmetrisch** sind. Die Exzess-Kurtosis `r options(digits=3);kurtosi(df3[,6])` liegt im negativen Bereich, was auf leichte Ränder, einen im Vergleich zur Normalverteilung abgeflachten Peak und eher wenige Ausreißer hindeutet. Passend dazu sind einerseits im Q-Q-Plot leichte Ränder angedeutet, und in ECDF Plot und Boxplot keine Ausreißer ersichtlich.
+
+Wobei der Q-Q-Plot auf den ersten Blick eine Normalverteilung nicht direkt ausschließt, deuten die Density Kurve in Histogramm und Violinplot und der ECDF Plot eher darauf hin, dass die Daten nicht typisch normalverteilt sind. Da auch der Shapiro-Wilk test dies mit p < 0.05 (p von 0,04582 = signifikant, also die Nullhypothese, dass die Daten normalverteilt sind, kann verworfen werden) bestätigt, werden die Daten daher insgesamt als **nicht normalverteilt** beurteilt. 
+
+```{r hsgrad_stats2, comment=">", include=TRUE, message=FALSE, warning=FALSE}
+shapiro.test(df3[,6])
+```
+
+Als sinnvolle Lage- und Variationsmaße werden aufgrund dieser Beobachtungen der Median **`r options(digits=3);median(df3[,6])` %** und die **MAD des Medians `r options(digits=3);mad(df3[,6])` %** erachtet. Die Interquartilsdistanz beträgt `r options(digits=3);IQR(df3[,6])`
+
+Je nach Anwendung würde die Verwendung des arithmetischen Mittelwertes `r options(digits=3);mean(df3[,6])` % und der Standardabweichung `r options(digits=3);sd(df3[,6])` % hier aufgrund der Ähnlichkeit zu Median und MAD möglicherweise aber auch keine groben Probleme verursachen.
+
+\pagebreak
+
+## 2.2.8 Frost
+Die in der Variable "Frost" enthaltenen Werte spiegeln die durchschnittliche Anzahl der Tage aufgeschlüsselt nach US Bundesstaat wider, an welchen das Temperaturminimum unter dem Gefrierpunkt lag. Die Werte wurden von 1931–1960 in der Hauptstadt oder einer großen Stadt des jeweiligen Bundesstaates erhoben. Die Verteilung der Werte kann beispielsweise folgendermaßen grafisch dargestellt werden:
+
+```{r frost_plots, include=FALSE, message=FALSE, warning=FALSE}
+help(state.x77)
+
+fro_hist <- ggplot(df3, aes(x = `Frost`, y= after_stat(density)))+
+  geom_histogram(color="black", fill="lightgrey", breaks = seq(0, 200, by = 12))+
+  geom_density(color = "red")+
+  theme_classic()+
+  ggtitle("Histogram Frost")+
+  labs(x= "Frost (avg. days)", y = "Density")+
+  scale_x_continuous(breaks=seq(0,200,by=50))+
+  theme(plot.title = element_text(hjust = 0.5))
+fro_hist
+
+fro_box <- ggplot(df3, aes(x = `Frost`))+
+  geom_boxplot(color="black", fill="lightgrey", width = 2)+
+  theme_classic()+
+  ggtitle("Boxplot Frost")+
+  labs(x= "Frost (avg. days)", y = "y")+
+  scale_x_continuous(breaks=seq(0,200,by=50))+
+  theme(plot.title = element_text(hjust = 0.5),  axis.title.y = element_text(size = 30, color="white"), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+fro_box
+
+fro_qq <- ggplot(df3, aes(sample=df3$Frost))+
+  stat_qq()+
+  stat_qq_line(color="red")+
+  theme_classic()+
+  ggtitle("Q-Q-Plot Frost")+
+  labs(x= "Theoretical Quantiles", y = "Sample Quantiles")+
+  scale_y_continuous(breaks=c(0,50,100,150,200))+
+  theme(plot.title = element_text(hjust = 0.5))
+fro_qq
+
+fro_ecdf <- ggplot(df3, aes(df3$Frost))+
+  stat_ecdf(geom = "step")+
+    theme_classic()+
+  ggtitle("ECDF Frost")+
+  labs(x= "Frost (avg. days)", y = "Frequency")+
+  scale_x_continuous(breaks=c(0,50,100,150,200))+
+  theme(plot.title = element_text(hjust = 0.5))
+fro_ecdf
+
+fro_violin <- ggplot(df3, aes(x = 1, y = df3$Frost))+
+  geom_violin(trim = FALSE, fill = "lightgrey", width = 1)+
+  geom_boxplot(width = 0.1)+
+  theme_classic()+
+  ggtitle("Violinplot Frost")+
+  labs(x= "y", y = "Frost (avg. days)")+
+  coord_flip()+
+  scale_y_continuous(limits=c(0,200,by=50))+
+  theme(plot.title = element_text(hjust = 0.5), axis.title.y = element_text(size = 30, color="white"), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+fro_violin
+
+library(gridExtra)
+png("fro_plots.png", width = 6, height = 7, units ='in', res = 900)
+fro_plots <- grid.arrange(fro_hist, fro_box, fro_qq, fro_violin, fro_ecdf, nrow=3)
+dev.off()
+```
+
+\includegraphics{fro_plots.png}
+
+```{r frost stats, include=FALSE, message=FALSE, warning=FALSE}
+library(psych)
+mean(df3[,7])
+median(df3[,7])
+mad(df3[,7])
+sd(df3[,7])
+IQR(df3[,7])
+skew(df3[,7])
+kurtosi(df3[,7])
+shapiro.test(df3[,7])
+```
+Histogramm und Violinplot zeigen, dass die Daten unimodal, Ausreißerfrei und leicht linksschief sind. ECDF Plot und Q-Q-Plot bestätigen dies, denn auch im ECDF Plot sind keine Ausreißer erkennbar und die Punkte an den Rändern des Q-Q-Plots die von der Geraden abweichen deuten auf leichte Ränder hin. Eine potentielle Normalverteilung der Daten kann anhand der Plots allein jedoch nicht eindeutig festgestellt werden.
+
+Ein Vergleich des arithmetischen Mittelwerts `r options(digits=3);mean(df3[,7])` durchschnittl. Tage mit dem Median `r options(digits=3);median(df3[,7])` durchschnittl. Tage, zeigt ebenfalls, dass die Daten linksschief sind. Die Skewness von `r options(digits=3);skew(df3[,7])` legt nahe, dass die Daten **nahezu symmetrisch** sind. Die Exzess-Kurtosis `r options(digits=3);kurtosi(df3[,7])` liegt ebenfalls im negativen Bereich, was auf leichte Ränder, einen im Vergleich zur Normalverteilung abgeflachten Peak und eine geringe Zahl an Ausreißern hindeutet. Um zu beurteilen, ob die Verteilung der Frost-Daten einer Normalverteilung ungefähr entspricht, wurde auch hier zusätzlich der Shapiro Wilk Test durchgeführt. Das Ergebnis fällt, wie im Folgenden ersichtlich, zwar sehr knapp, aber mit p = 0.05267, also größer 0.05, doch so aus, dass die Nullhypothese der Normalverteilung nicht verworfen werden muss und die Daten somit letztendlich als **approximativ normalverteilt** bezeichnet werden können:
+
+```{r frost_stats2, comment=">", include=TRUE, message=FALSE, warning=FALSE}
+shapiro.test(df3[,7])
+```
+
+Aufgrund des knappen Ergebnisses empfehlen sich im Endeffekt aufgrund ihrer Robustheit eher der **Median `r options(digits=3);median(df3[,7])` durschnittliche Tage pro Jahr** und die **MAD des Medians mit `r options(digits=3);mad(df3[,7])` durchschn. Tagen pro Jahr** als sinnvolle Lage- und Variationsmaße. Die Interquartilsdistanz beträgt `r options(digits=3);IQR(df3[,7])`.
+
+Im Vergleich dazu beträgt der arithmetische Mittelwert `r options(digits=3);mean(df3[,7])` durchschn. Tage und die Standardabweichung `r options(digits=3);sd(df3[,7])` durchschn. Tage.  
+
+\pagebreak
+
+## 2.2.9 Zusammenhänge zwischen den Variablen
+
+Als nächstes wurden die Zusammenhänge zwischen den Variablen Population, Income, Illiteracy, Life Expectancy, Murder, HS Graduation und Frost in Scatterplot Matrizen dargestellt, welche veranschaulichen sollen, wie sich die Werte zweier Variablen zueinander verhalten. In der einfachsten Form sieht dies so aus:
+
+```{r scatterUS1, echo=FALSE, warning=FALSE, fig.height=9, fig.width=9, fig.align='center'}
+df4=df3[-8]
+plot(df4)
+```
+
+Um mögliche Korrelationen zwischen zwei Variablen sichtbar zu machen, sind in den nachfolgenden beiden Grafiken auch hier die Regressionsgerade (in Dunkelrot) und entweder der Pearson Korrelationskoeffizient R (in Orange) oder R² (in Dunkelgrün) abgebildet:
+
+```{r scatterUS2, echo=FALSE, warning=FALSE, fig.height=8, fig.width=8, fig.align='center'}
+
+upper_panel_regression_line = function(x,y, ...){
+  points(x,y,...)
+  linear_regression = lm(y~x)
+  linear_regression_line = abline(linear_regression, col="darkred")
+}
+
+lower_panel_r = function(x, y, ...){
+  usr <- par("usr"); on.exit(par(usr))
+  par(usr = c(0, 2, 0, 2))
+  r = cor(x, y)
+  r_print = round(r, digits = 2)
+  text_of_r = paste0("R = ", r_print)
+  text(1, 1,cex=1.5, text_of_r, col="darkorange")
+}
+
+pairs(df4, main = "US Scatterplot Matrix with Correlation Coefficients (R)", 
+lower.panel=lower_panel_r, upper.panel = 
+        upper_panel_regression_line)
+```
+
+```{r scatterUS3, echo=FALSE, warning=FALSE, fig.height=8, fig.width=8, fig.align='center'}
+
+upper_panel_regression_line = function(x,y, ...){
+  points(x,y,...)
+  linear_regression = lm(y~x)
+  linear_regression_line = abline(linear_regression, col="darkred")
+}
+
+#A function to calculate and show the R-squared value of each panel
+lower_panel_r_squared = function(x, y, ...){
+  usr <- par("usr"); on.exit(par(usr))
+  par(usr = c(0, 2, 0, 2))
+  r = cor(x, y)
+  r_squared = round(r^2, digits = 2)
+  text_of_r_squared = paste0("R² = ", r_squared)
+  text(1, 1,cex=1.5, text_of_r_squared, col="darkgreen")
+}
+
+pairs(df4, main = "US Scatterplot Matrix with Coefficients of Determination (R²)", 
+lower.panel=lower_panel_r_squared, upper.panel = 
+        upper_panel_regression_line)
+```
+
+Entsprechend der in 2.1 genannten Quelle werden auch hier nur Korrelationskoeffizienten ab 0.6 oder R² Werte ab 0.35 beziehungsweise unter -0.6 oder -0.35 (R²) als signifikant erachtet. Folgende Zusammenhänge sind auf diese Weise auf den ersten Blick erkennbar:
+
+### High School Absolventen (HS Grad) und Einkommen:
+Zwischen diesen beiden Variablen liegt mit R = 0.62 und R² = 0.38 ein Zusammenhang vor. Dies suggeriert, dass in US-Bundesstaaten mit einem höheren Anteil an High School Abslovententinnen auch das Pro-Kopf-Einkommen höher ist.
+
+### HS Grad und Analphabetismus (Illiteracy):
+Der Korrelationskoeffizienten von R = -0.66 (R² = 0.43) zwischen diesen beiden Werten deutet definitiv auf einen Zusammenhang hin. Bessere Bildung bedeutet eine geringere Analphabetenrate.
+
+### Frost und Illiteracy:
+Interessanterweise wurde mit R = -0.67 (R² = 0.45) auch ein eindeutiger Zusammenhang zwischen kälteren Bundesstaaten und deren Bevölkerungsanteil an Analphabeten gefunden. Über die Kausalität lassen sich jedoch keine Aussagen treffen. 
+
+### Mordrate (Murder) und Illiteracy:
+Der Korrelationskoeffizient R beträgt zwischen diesen beiden Variablen 0.70. Die hohe Mordrate hängt mit der Analpabentenrate stark zusammen. Man kann also sagen, höhere Bildung verringert die Gewalt in den amerikanischen Bundesstaaten.
+
+### Murder und Lebenserwartung:
+Der wohl offensichtliche Zusammenhang zwischen diesen beiden Variablen ist mit einem vergleichsweise sehr hohen R von -0.78 (R² = 0.61) eindeutig erkennbar. Daraus lässt sich schließen, dass die Lebenserwartung in Bundesstaaten mit hoher Mordrate geringer ist.
+
+### HS Grad und Lebenserwartung:
+Mit einem R von 0.58 und einem R² von 0.34 liegen diese beiden Variablen im Vergleich zu den anderen hier genannten Zusammenhängen knapp unter der Cut-off Grenze. Bei weniger strengen Grenzwerten könnte dieses Ergebnis allerdings so interpretiert werden, dass eine bessere Bildung mit einer höheren Lebenserwartung zusammenhängt. Die Korrelation ist hier jedoch weniger stark ausgeprägt, weshalb diese Aussage nicht ohne weitere Tests getätigt werden sollte.
+
+\pagebreak
+
+# Beispiel 2.3
+
+## 2.3.1 Übersicht über den Datensatz "Lake Huron"
+
+Der in R integrierte Datensatz "Lake Huron" beinhaltet Messdaten der Tiefe des Lake Huron in der Einheit "Fuß" (entspricht feet bzw. ft). Insgesamt wurden zwischen den Jahren 1875 und 1972 98 Messdaten aufgezeichnet und in diesem Datenset inkludiert.
+
+Der Datensatz sieht folgendermaßen aus:
+
+```{r Lake Huron, comment=">"}
+library(ggplot2)
+library(hrbrthemes)
+print(LakeHuron)
+```
+Nachfolgende Übersicht gibt einen groben ersten Überblick über die Datenverteilung durch Angabe von Minimum, Maximum, Mittelwert, Median und der 1. und 3. Quantilwerte (in ft): 
+
+```{r Lake Huron stats1, comment=">"}
+summary(LakeHuron)
+```
+
+## 2.3.2 Datenexploration ohne Berücksichtigung des Zeitreihenaspektes
+
+Zunächst wurden die Daten in einen Data Frame konvertiert und danach auf gewohnte Art und Weise ohne Berücksichtigung des Zeitreihenaspektes mittels Histogramm, Boxplot, ECDF Plot, Q-Q-Plot und Violinplot visualisiert und exploriert:
+
+```{r Lake Huron conv, comment=">", include=TRUE, message=FALSE, warning=FALSE}
+
+# Conversion der Daten in einen brauchbaren Data Frame:
+LaHu <- LakeHuron
+LH <- data.frame(Year = 1875:1972, 
+                 Depth  = LaHu,
+                 StDev = runif(length(LaHu),0,1))
+head(LH, n=4)
+```
+
+```{r Lake Huron noT, include=FALSE, message=FALSE, warning=FALSE}
+print(LH)
+# Conversion des Datentyps + Überprüfung, ob alle Spalten numerisch sind:
+
+LH$Year <- as.numeric(LH$Year)
+LH$Depth <- as.numeric(LH$Depth)
+LH$StDev <- as.numeric(LH$StDev)
+
+class(LH$Year)
+class(LH$Depth)
+class(LH$StDev)
+
+# Erstellen der Plots:
+
+lh_hist <- ggplot(LH, aes(x = LH$Depth, y= after_stat(density)))+
+  geom_histogram(color="black", fill="lightgrey", breaks = seq(575, 583, by = 0.4))+
+  geom_density(color = "red")+
+  theme_classic()+
+  ggtitle("Histogram Lake Huron")+
+  labs(x= "Depth (ft)", y = "Density")+
+  scale_x_continuous(breaks=seq(575, 583,by=2))+
+  theme(plot.title = element_text(hjust = 0.5))
+lh_hist
+
+lh_box <- ggplot(LH, aes(x = LH$Depth))+
+  geom_boxplot(color="black", fill="lightgrey", width = 2)+
+  theme_classic()+
+  ggtitle("Boxplot Lake Huron")+
+  labs(x= "Depth (ft)", y = "y")+
+  scale_x_continuous(breaks=seq(575, 583,by=2))+
+  theme(plot.title = element_text(hjust = 0.5),  axis.title.y = element_text(size = 30, color="white"), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+lh_box
+
+lh_qq <- ggplot(LH, aes(sample=LH$Depth))+
+  stat_qq()+
+  stat_qq_line(color="red")+
+  theme_classic()+
+  ggtitle("Q-Q-Plot Lake Huron")+
+  labs(x= "Theoretical Quantiles", y = "Sample Quantiles")+
+  scale_y_continuous(breaks=c(576, 578, 580, 582, 584))+
+  theme(plot.title = element_text(hjust = 0.5))
+lh_qq
+
+lh_ecdf <- ggplot(LH, aes(LH$Depth))+
+  stat_ecdf(geom = "step")+
+    theme_classic()+
+  ggtitle("ECDF Lake Huron")+
+  labs(x= "Depth (ft)", y = "Frequency")+
+  scale_x_continuous(breaks=c(576, 578, 580, 582, 584))+
+  theme(plot.title = element_text(hjust = 0.5))
+lh_ecdf
+
+lh_violin <- ggplot(LH, aes(x = 1, y = LH$Depth))+
+  geom_violin(trim = FALSE, fill = "lightgrey", width = 1)+
+  geom_boxplot(width = 0.1)+
+  theme_classic()+
+  ggtitle("Violinplot Lake Huron")+
+  labs(x= "y", y = "Depth (ft)")+
+  coord_flip()+
+  scale_y_continuous(limits=c(575, 583, by=2))+
+  theme(plot.title = element_text(hjust = 0.5), axis.title.y = element_text(size = 30, color="white"), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+lh_violin
+
+library(gridExtra)
+png("lakehuron_plots.png", width = 6, height = 7, units ='in', res = 900)
+lakehuron_plots <- grid.arrange(lh_hist, lh_box, lh_qq, lh_violin, lh_ecdf, nrow=3)
+dev.off()
+```
+
+\includegraphics{lakehuron_plots.png}
+
+```{r lake huron stats, include=FALSE, message=FALSE, warning=FALSE}
+library(psych)
+mean(LH[,2])
+median(LH[,2])
+mad(LH[,2])
+sd(LH[,2])
+IQR(LH[,2])
+skew(LH[,2])
+kurtosi(LH[,2])
+shapiro.test(LH[,2])
+```
+Die explorativen Grafiken und Summary Statistics zeigen, dass es sich bei dem Datensatz Lake Huron aus nachfolgenden Gründen um einen insgesamt sehr schön **symmetrischen, einer Normalverteilung entsprechenden Datensatz** handelt:
+
+- Die Dichtekurven in Histogramm und Violinplot verlaufen, mit Ausnahme eines kleinen Peaks um 577 ft Tiefe, in einer schönen, relativ gleichmäßigen Glockenform. Die Daten sind somit eindeutig unimodal und minimal linksschief. 
+- Weder in den Boxplots noch im ECDF Plot sind Ausreißer zu erkennen. Der Median ist relativ Mittig angesiedelt und die Whisker sind auf beiden Seiten des Boxplots in etwa gleich lang. 
+- Die Datenpunkte liegen im Q-Q-Plot fast ausnahmslos auf oder sehr nahe an der roten Gerade, die eine Normalverteilung widerspiegelt. 
+- Der Verlauf der Kurve im ECDF Plot verläuft in relativ gleichmäßigen Schritten. 
+- Der arithmetische Mittelwert `r options(digits=3);mean(LH[,2])` ft und der Median `r options(digits=3);median(LH[,2])` ft sind beinahe ident, wie auch die zugehörigen Streuungsmaße (Standardabweichung `r options(digits=3);sd(LH[,2])` ft, MAD `r options(digits=3);mad(LH[,2])` ft). 
+- Die Schiefe/Skewness der Daten (`r options(digits=3);skew(LH[,2])`) bestätigt die symmetrische Verteilung der Daten. Das Gewicht in den Rändern, bzw. die Exzess-Kurtosis liegt mit `r options(digits=3);kurtosi(LH[,2])` im leicht negativen Bereich, was leichte Ränder, geringe Ausreißeranzahl und einen leicht abgeflachten Peak im Vergleich zur Normalverteilung andeutet. 
+- Die Normalverteilung der Daten wird zudem mit p > 0.05 vom Shapiro-Wilk Test bestätigt.
+
+```{r lakehur_stats2, comment=">", include=TRUE, message=FALSE, warning=FALSE}
+shapiro.test(LH[,2])
+```
+
+Aufgrund dieser Datenverteilung eignen sich der oben genannte Mittelwert und die genannte Standardabweichung in diesem Fall im Prinzip genauso gut als Lage- und Skalenmaße, wie die robusteren Werte Median und MAD. Schwere Ränder sind mittels Q-Q-Plot und Berechnung der Exzess-Kurtosis keine zu erkennen. 
+
+## 2.3.2 Datenexploration mit Berücksichtigung des Zeitreihenaspektes
+
+Um den Zeitreihenaspekt in die explorative Datenanylse einfließen zu lassen, ist in der nachfolgenden Grafik der Verlauf der Seetiefe von 1875 bis 1972 dargestellt, inklusive Angabe der Standardabweichung (in Hellblau): 
+
+``` {r dataplot, include=FALSE, message=FALSE, warning=FALSE}
+
+# Dataplot Lake Huron
+lh_timeplot <- LH%>%
+  ggplot(aes(x = Year, y = Depth)) + 
+  geom_ribbon(aes(ymin = Depth - StDev, ymax = Depth + StDev), fill = "lightblue") + 
+  geom_line(color = "darkgreen", size = 1) +
+  theme_classic() +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  ggtitle("Depth of Lake Huron over time") +
+  scale_y_continuous(limits=c(575, 583, by=5))+
+  scale_x_continuous(limits=c(1874, 1974, by=10))
+  labs(x = "Year", y= "Depth (ft)")
+lh_timeplot
+
+png("lh_timeplot.png", width = 6, height = 3.5, units = 'in', res = 900)
+lh_timeplot 
+dev.off()
+
+```
+
+\includegraphics{lh_timeplot.png}
+
+Generell scheint der Wasserstand zwischen 1875 und 1972 gesunken zu sein, wie von der dunkelgrünen Trendlinie visualisiert, allerdings nicht durchgängig. Das Maximum wurde 1876 gemessen, das Minimum im Jahr 1964. 
+
+\pagebreak
+
+# Beispiel 2.4
+
+## 2.4.1 Übersicht über den Datensatz "Titanic"
+
+Bei dem Datensatz "Titanic" handelt es sich um einen vierdimensionalen Array, der in insgesamt 2201 Observationen das Schicksal der Passagiere der Titanic beschreibt. Die Daten sind in die vier Faktoren Status (1.-3. Klasse, Crew), Geschlecht (m, f), Alter (Kind, Erwachsener) und Überlebensstatus (Ja, Nein) unterteilt und können mittels Mosaikplot dargestellt werden:
+
+```{r dataset titanic, comment=">", echo=TRUE, warning=FALSE, message=FALSE}
+head(Titanic)
+summary(Titanic)
+library(vcd)
+mosaic(Titanic, shade = TRUE)
+```
+Ein Mosaikplot ist eine visuelle Darstellung des Zusammenhangs zwischen zwei oder mehr kategorialen Variablen. Es ist eine flächenproportionale Visualisierung der beobachteten Häufigkeiten, bestehend aus Kacheln (entsprechend den Zellen der Kontigenztabelle), welche durch rekursive, vertikale und horizontale Teilungen eines Rechtecks erstellt werden. Die Fläche jeder Kachel ist proportional zum entsprechenden Zelleneintrag aus der Datentabelle. Rote Kacheln weisen auf signifikante negative Residuen hin, bei denen die Häufigkeit geringer ist als erwartet. Blaue Kacheln weisen im Gegensatz dazu auf signifikante positive Residuen hin, bei denen die Häufigkeit größer ist als erwartet.
+
+Um die Lesbarkeit der Grafik zu verbessern, wurde in weiterer Folge dargestellt, wie die einzelnen Variablen Alter, Geschlecht und Klasse das Überleben der Passagiere beeinflussten.
+
+## 2.4.2 Einfluss des Geschlechts auf das Überleben
+
+```{r, echo=FALSE}
+mosaic(~ Sex + Survived, data = Titanic,
+main = "Survival on the Titanic", shade = TRUE, legend = TRUE)
+```
+
+Dieser Mosaikplot zeigt, dass der Anteil an Frauen die das Schiffsunglück überlebten höher war als der Anteil an Männern. Die Farben besagen, dass die Häufigkeit der Männer das Schiffsunglück zu überleben signifikant geringer war als erwartet - bei den Frauen ist es umgekehrt.
+
+## 2.4.3 Einfluss des Alters auf das Überleben
+
+```{r, echo=FALSE}
+mosaic(~ Age + Survived, data = Titanic,
+main = "Survival on the Titanic", shade = TRUE, legend = TRUE)
+```
+In diesem Mosaikplot wird deutlich, dass der Anteil der Kinder die überlebten höher war, als der der Erwachsenen. Beziehungsweise, dass die Häufigkeit des Überlebens bei Kindern höher war als erwartet, wie im Plot durch die blaue Box und die positiven Residuen dargestellt.
+
+## 2.4.4 Einfluss der Klasse auf das Überleben
+
+```{r , echo=FALSE}
+mosaic(~ Class + Survived, data = Titanic,
+main = "Survival on the Titanic", shade = TRUE, legend = TRUE)
+```
+Dieser Plot zeigt, dass Reisende der höheren Klassen eher überlebten als Reisende niedrigerer Klassen, beziehungsweise, dass mehr Reisende der 1. Klasse überlebten als erwartet. Der Mosaikplot würde nahe legen, dass der Anteil der 3. Klasse-Passagiere die überlebt haben in etwa gleich dem der Crew ist. Hierbei kommt jedoch das Simpson Paradoxon zum Ausdruck.
+
+## 2.4.5 Simpson's Paradoxon
+
+Simpson's Paradoxon tritt auf, wenn es eine dritte Variable gibt, die mit der Ergebnisvariable korreliert und nicht gleichmäßig auf die beiden Gruppen verteilt ist. Dies kann zu einer scheinbaren Umkehrung des Zusammenhangs zwischen der unabhängigen und der abhängigen Variable führen. Dieses Paradoxon beschreibt also, dass die Bewertung verschiedener Gruppen unterschiedlich ausfallen kann, je nachdem ob man die Ergebnisse der Gruppen kombiniert oder nicht. 
+
+Im Fall des Titanic Datensatzes wird deutlich, dass unter Berücksichtigung des Geschlechts die Überlebensraten für die  3. Klasse und der Crew sich für beide Geschlechter deutlich zu Gunsten der Crew verschiebt.
+
+```{r , echo=FALSE}
+all_3rd_Class = 706
+all_Crew = 862
+male_3rd_class = 510
+female_3rd_class = 196
+male_Crew = 862
+female_Crew = 23
+all_3rd_Class_S = 178
+all_Crew_S = 212
+male_3rd_class_S = 88
+female_3rd_class_S = 90
+male_Crew_S = 192
+female_Crew_S = 20
+
+#Berechnung der Überlebensraten
+SR_all_3rd_Class = all_3rd_Class_S/all_3rd_Class
+SR_all_Crew = all_Crew_S/all_Crew
+SR_M_3rd_Class = male_3rd_class_S/male_3rd_class
+SR_M_Crew = male_Crew_S/male_Crew
+SR_F_3rd_Class = female_3rd_class_S/female_3rd_class
+SR_F_Crew = female_Crew_S/female_Crew
+```
+
+```{r, echo=FALSE, comment=">"}
+#Vergleich der Überlebensraten
+SR_all<-cbind(SR_all_3rd_Class, SR_all_Crew)
+print(SR_all)
+SR_male = cbind(SR_M_3rd_Class, SR_M_Crew)
+print(SR_male)
+SR_female = cbind(SR_F_3rd_Class, SR_F_Crew)
+print(SR_female)
+```
+Ursprung des Simpson Paradoxons ist, dass die einzelnen Überlebenswahrscheinlichleiten aufgrund der unterschiedlichen Verhältnisse von Männern und Frauen mit unterschiedlicher Gewichtung in das Gesamtergebniss eingehen. Da Männer eine geringere Überlebenswahrscheinlichkeit hatten als Frauen
+und die Crew hauptsächlich aus Männern bestand, scheint die Überlebenswahrscheinlichkeit der Crew insgesamt geringer als erwartet.
