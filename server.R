@@ -5,6 +5,8 @@ library(tidyr)
 library(dplyr)
 library(MASS)
 library(GGally)
+library(car)
+library(vcd)
 
 #Server code of the app
 server <- function(input, output, session) {
@@ -43,8 +45,9 @@ server <- function(input, output, session) {
            "swiss" = as.data.frame(swiss),
            "state.x77" = as.data.frame(state.x77) %>% 
              rename("Life_Exp" = 4, "HS_Grad" = 6),
+           "UN" = na.omit(as.data.frame(UN)),
            "LakeHuron" = data.frame(row.names = c(1875:1972), Depth = LakeHuron),
-           "Titanic" = as.data.frame(Titanic),
+           "Titanic" = Titanic,
            "PimaIndians" = as.data.frame(Pima.tr),
            "PipettingTraining" = data.frame(
              before = c(1.36, 1.37, 1.29, 1.22, 1.38, 1.31, 1.40, 1.39, 1.30, 1.37), 
@@ -222,5 +225,13 @@ server <- function(input, output, session) {
     } else {
       displayError()
     }
+  }, height = 700, width = 700)
+  
+  # Output the selected dataset as a Mosaic plot
+  output$mosaic <- renderPlot({
+    data <- selectedData()
+    if (!is.null(data)) {
+        mosaic(data, main = "Mosaic Plot", shade = TRUE, legend = TRUE)
+      }
   }, height = 700, width = 700)
 }
