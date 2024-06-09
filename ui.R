@@ -3,22 +3,22 @@ library(shiny)
 # UI code for the app
 ui <- fluidPage(
   # App title
-  titlePanel("Statistik #2 - Explorative Datenanalse"),
+  titlePanel("Statistik_UE - Visualisation"),
   
   # Sidebar panel --> data/variable selection
   sidebarLayout(
     sidebarPanel(
       # Dropdown menu for selecting dataset
       selectInput("dataset", "Choose dataset:",
-                  choices = c("swiss", "state.x77", "LakeHuron", "Titanic")),
+                  choices = c("swiss", "state.x77", "LakeHuron", "Titanic", "PimaIndians", "PipettingTraining", "BacterialCulture", "Salary")),
       
       # Dropdown menu for display type selection
       selectInput("display", "Choose display type:",
-                  choices = c("Data Table", "Histogram", "Box Plot", "Q-Q Plot", "ECDF Plot")),
+                  choices = c("Data Table", "Histogram", "Box Plot", "Q-Q Plot", "ECDF Plot", "Scatter Plot Matrix")),
       
-      # Conditional panel for variable selection
+      # Conditional panel for variable selection single
       conditionalPanel(
-        condition = "input.display != 'Data Table'",
+        condition = "input.display != 'Data Table' && input.display != 'Scatter Plot Matrix'",
         uiOutput("variableSelect")
       ),
       
@@ -56,6 +56,10 @@ ui <- fluidPage(
       conditionalPanel(
         condition = "input.display == 'ECDF Plot'",
         plotOutput("ecdf")
+      ),
+      conditionalPanel(
+        condition = "input.display == 'Scatter Plot Matrix'",
+        plotOutput("scatter_matrix")
       )
     )
   )
