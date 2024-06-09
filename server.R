@@ -65,9 +65,21 @@ server <- function(input, output, session) {
     )
   })
   
-  # Returns selected variable
+  # Update the choices for scatter plot variable selection based on the selected dataset
+  observe({
+    data <- selectedData()
+    updateSelectInput(session, "scatter_x", choices = names(data), selected = names(data)[1])
+    updateSelectInput(session, "scatter_y", choices = names(data), selected = names(data)[2])
+  })
+  
+  # Returns selected variable - set default to variable 1
   selectedVariable <- reactive({
-    input$variable
+    data <- selectedData()
+    if (!is.null(input$variable) && length(input$variable) > 0) {
+      input$variable
+    } else {
+      names(data)[1]
+    }
   })
   
   # UI for variable selection single
@@ -174,6 +186,39 @@ server <- function(input, output, session) {
     if (all(sapply(data, is.numeric))) {
       pairs(data, lower.panel = panel.smooth, upper.panel = panel.cor, 
             diag.panel = panel.hist,las=1) 
+    } else {
+      displayError()
+    }
+  }, height = 700, width = 700)
+
+  # Output the selected dataset as a Scatter Plot
+  output$scatter <- renderPlot({
+    data <- selectedData()
+    x_var <- input$scatter_x
+    y_var <- input$scatter_y
+    if (!is.null(x_var) && !is.null(y_var) && is.numeric(data[[x_var]]) && is.numeric(data[[y_var]])) {
+      if (input$log_transform) {
+        data <- data %>%
+          mutate(across(c(x_var, y_var), log, .names = "log_{col}"))
+        ggplot(data, aes_string(x = paste0("log_", x_var), y = paste0("log_", y_var))) +
+          geom_point() +
+          geom_smooth(method = "lm", col = "red") +
+          labs(title = paste("Scatter Plot \n[Log(", x_var, ") vs Log(", y_var, ")]"), 
+               x = paste("Log(", x_var, ")"), y = paste("Log(", y_var, ")")) + 
+          theme(axis.text = element_text(size = 15), 
+                axis.ticks.length=unit(.25, "cm"),
+                axis.title=element_text(size=15,face="bold"),
+                plot.title = element_text(face="bold", size=20))
+      } else {
+        ggplot(data, aes_string(x = x_var, y = y_var)) +
+          geom_point() +
+          geom_smooth(method = "lm", col = "red") +
+          labs(title = paste("Scatter Plot \n[", x_var, " vs ", y_var, "]"), x = x_var, y = y_var) + 
+          theme(axis.text = element_text(size = 15), 
+                axis.ticks.length=unit(.25, "cm"),
+                axis.title=element_text(size=15,face="bold"),
+                plot.title = element_text(face="bold", size=20))
+      }
     } else {
       displayError()
     }
