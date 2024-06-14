@@ -179,7 +179,7 @@ Die F-Statistik (625.9) und der p-value von < 2.2e-16 lässt uns die H0 verwerfe
 ### Überprüfung der Residuen 
 
 ```{r }
-par(mfrow = c(2, 2))
+#par(mfrow = c(2, 2))
 plot(log.lm)
 ```
 

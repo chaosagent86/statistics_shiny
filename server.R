@@ -1,17 +1,25 @@
-library(shiny)
-library(brochure)
-library(ggplot2)
-library(tidyr)
-library(dplyr)
-library(MASS)
-library(GGally)
-library(car)
-library(vcd)
+library(shiny) # Shiny App
+library(DT) # Alternative Data Table Darstellung
+library(bslib)
+
+library(ggplot2) # Visualisation
+library(GGally) # Extension to ggplot2
+
+library(tidyr) # Data modification
+library(dplyr) # Data modification
+
+library(MASS) # Datensatz PimaIndians ('Pima.tr')
+library(car) # Datensatz UN
+
+
+# ---- vermutlich nicht mehr benötigte packages ------------------
+# library(brochure)
+# library(vcd)
 
 #Server code of the app
 server <- function(input, output, session) {
-  
-  #Function to generate panel
+
+  # -- Allgemeine Funktionen: Function to generate Panels -------
   panel.hist <- function(x, ...)
   {
     usr <- par("usr"); on.exit(par(usr))
@@ -32,12 +40,14 @@ server <- function(input, output, session) {
     text(0.5, 0.5, txt, cex = cex.cor * r)
   }
   
-  #Error function in case of non-numeric values
+  # -- Error Functions --------------
   displayError <- function()
   {
     plot.new()
     text(0.5, 0.5, "Error! Non-numeric values cannot be displayed.", cex = 1.5)
   }
+  
+  # -- Functions: SelectedData (in general - dropdown menu)  --------------
   
   # Returns selected dataset
   selectedData <- reactive({
@@ -68,13 +78,7 @@ server <- function(input, output, session) {
     )
   })
   
-  # Update the choices for scatter plot variable selection based on the selected dataset
-  observe({
-    data <- selectedData()
-    updateSelectInput(session, "scatter_x", choices = names(data), selected = names(data)[1])
-    updateSelectInput(session, "scatter_y", choices = names(data), selected = names(data)[2])
-  })
-  
+  # -- Functions: SelectedVariable (in general)  --------------
   # Returns selected variable - set default to variable 1
   selectedVariable <- reactive({
     data <- selectedData()
@@ -93,107 +97,71 @@ server <- function(input, output, session) {
     }
   })
   
-  # Output the selected dataset as a table
-  output$table <- renderTable({
-    selectedData()
+  # --- Plot: Data Set ----------------------
+  
+  #Output the selected dataset as a table
+  # output$table <- renderTable({
+  #   selectedData()
+  # })
+  
+  output$table <- DT::renderDT({
+    selectedData() %>%
+      DT::datatable()
   })
   
-  output$hist <- renderPlot({
-    data <- selectedData()
-    var <- selectedVariable()
-    bins <- input$bins
-    if (!is.null(var) && is.numeric(data[[var]])) {
-      ggplot(data, aes_string(x = var)) +
-        geom_histogram(bins = bins, fill = "blue", color = "black") +
-        labs(title = paste("Histogram \n[", var, "]"), x = var, y = "Frequency") + 
-        theme(axis.text = element_text(size = 15), 
-              axis.ticks.length=unit(.25, "cm"),
-              axis.title=element_text(size=15,face="bold"),
-              plot.title = element_text(face="bold", size=20))
-    } else {
-      displayError()
-    }
-  }, height = 700, width = 700)
+  # -- Plot: Summary --------------
   
-  # Output the selected dataset as a box plot using ggplot2
-  output$box <- renderPlot({
+  output$summaryOutput <- renderPrint({
     data <- selectedData()
-    var <- selectedVariable()
-    if (input$allVar) {
-      if (all(sapply(data, is.numeric))) {
-        data_long <- data %>%
-          pivot_longer(cols = everything(), names_to = "variable", values_to = "value")
-        ggplot(data_long, aes(x = variable, y = value)) +
-          geom_boxplot(fill = "blue", color = "black") +
-          labs(title = "Box Plot \n[all variables]", x = "Variable", y = "Value") + 
-          theme(axis.text = element_text(size = 15), 
-                axis.ticks.length=unit(.25, "cm"),
-                axis.title=element_text(size=15,face="bold"),
-                plot.title = element_text(face="bold", size=20))
+    summary(data)
+  })
+  
+  # -- Plot: Residuals --------------------
+  observe({
+    data <- selectedData()
+    updateSelectInput(session, "residuals_x", choices = names(data), selected = names(data)[1])
+    updateSelectInput(session, "residuals_y", choices = names(data), selected = names(data)[2])
+  })
+  
+  output$residuals <- renderPlot({
+    data <- selectedData()
+    x_var <- input$residuals_x
+    y_var <- input$residuals_y
+    if (!is.null(x_var) && !is.null(y_var) && is.numeric(data[[x_var]]) && is.numeric(data[[y_var]])) {
+      
+      if (input$res_log_transform_x) {
+        data_x <- log(data[[x_var]])
       } else {
-        displayError()
+        data_x <- data[[x_var]]
       }
-    } else {
-      if (!is.null(var) && is.numeric(data[[var]])) {
-        ggplot(data, aes_string(y = var)) +
-          geom_boxplot(fill = "blue", color = "black") +
-          labs(title = paste("Box Plot \n[", var, "]"), y = var) + 
-          theme(axis.text = element_text(size = 15), 
-                axis.ticks.length=unit(.25, "cm"),
-                axis.title=element_text(size=15,face="bold"),
-                plot.title = element_text(face="bold", size=20))
-      } else {
-        displayError()
-      }
-    }
-  }, height = 700, width = 700)
-  
-  # Output the selected dataset as a Q-Q plot using ggplot2
-  output$qq <- renderPlot({
-    data <- selectedData()
-    var <- selectedVariable()
-    if (!is.null(var) && is.numeric(data[[var]])) {
-      ggplot(data, aes_string(sample = var)) +
-        geom_qq() +
-        geom_qq_line(color = "red") +
-        labs(title = paste("Q-Q Plot \n[", var, "]")) + 
-        theme(axis.text = element_text(size = 15), 
-              axis.ticks.length=unit(.25, "cm"),
-              axis.title=element_text(size=15,face="bold"),
-              plot.title = element_text(face="bold", size=20))
-    } else {
-      displayError()
-    }
-  }, height = 700, width = 700)
-  
-  # Output the selected dataset as an ECDF plot using ggplot2
-  output$ecdf <- renderPlot({
-    data <- selectedData()
-    var <- selectedVariable()
-    if (!is.null(var) && is.numeric(data[[var]])) {
-      ggplot(data, aes_string(x = var)) +
-        stat_ecdf(geom = "step", color = "blue") +
-        labs(title = paste("ECDF Plot \n[", var, "]"), x = var, y = "ECDF") + 
-        theme(axis.text = element_text(size = 15), 
-              axis.ticks.length=unit(.25, "cm"),
-              axis.title=element_text(size=15,face="bold"),
-              plot.title = element_text(face="bold", size=20))
-    } else {
-      displayError()
-    }
-  }, height = 700, width = 700)
-  
-  # Output the selected dataset as a Scatter Plot Matrix
-  output$scatter_matrix <- renderPlot({
-    data <- selectedData()
-    if (all(sapply(data, is.numeric))) {
-      pairs(data, lower.panel = panel.smooth, upper.panel = panel.cor, 
-            diag.panel = panel.hist,las=1) 
-    } else {
-      displayError()
-    }
-  }, height = 700, width = 700)
 
+      if (input$res_log_transform_y) {
+        data_y <- log(data[[y_var]])
+      } else {
+        data_y <- data[[y_var]]
+      }
+      model <- lm(data_x ~ data_y)
+      
+      #model <- lm(data[[y_var]] ~ data[[x_var]])
+      par(mfrow = c(2, 2))  # Setze das Plot-Layout auf ein 2x2 Raster
+      plot(model)
+      par(mfrow = c(1, 1))  # Setze das Plot-Layout zurück
+    } else {
+      displayError()
+    }
+  }, width = 900, height = 900)
+  
+  
+  
+  # -- Plot: Scatter Plot ----------------
+  
+  # Update the choices for scatter plot variable selection based on the selected dataset
+  observe({
+    data <- selectedData()
+    updateSelectInput(session, "scatter_x", choices = names(data), selected = names(data)[1])
+    updateSelectInput(session, "scatter_y", choices = names(data), selected = names(data)[2])
+  })
+  
   # Output the selected dataset as a Scatter Plot
   output$scatter <- renderPlot({
     data <- selectedData()
@@ -227,7 +195,112 @@ server <- function(input, output, session) {
     }
   }, height = 700, width = 700)
   
-  #Output the selected dataset as a Mosaic plot
+  # -- Plot: ScatterPlot Matrix ------------------
+  
+  output$scatter_matrix <- renderPlot({
+    data <- selectedData()
+    if (all(sapply(data, is.numeric))) {
+      pairs(data, lower.panel = panel.smooth, upper.panel = panel.cor, 
+            diag.panel = panel.hist,las=1) 
+    } else {
+      displayError()
+    }
+  }, height = 700, width = 700)
+
+  # -- Plot: Histogramm (ggplot2) --------------------
+  
+  output$hist <- renderPlot({
+    data <- selectedData()
+    var <- selectedVariable()
+    bins <- input$bins
+    if (!is.null(var) && is.numeric(data[[var]])) {
+      ggplot(data, aes_string(x = var)) +
+        geom_histogram(bins = bins, fill = "blue", color = "black") +
+        labs(title = paste("Histogram \n[", var, "]"), x = var, y = "Frequency") + 
+        theme(axis.text = element_text(size = 15), 
+              axis.ticks.length=unit(.25, "cm"),
+              axis.title=element_text(size=15,face="bold"),
+              plot.title = element_text(face="bold", size=20))
+    } else {
+      displayError()
+    }
+  }, height = 700, width = 700)
+  
+  # -- Plot: Boxplot (ggplot2) -----------------------
+  
+  output$box <- renderPlot({
+    data <- selectedData()
+    var <- selectedVariable()
+    if (input$allVar) {
+      if (all(sapply(data, is.numeric))) {
+        data_long <- data %>%
+          pivot_longer(cols = everything(), names_to = "variable", values_to = "value")
+        ggplot(data_long, aes(x = variable, y = value)) +
+          geom_boxplot(fill = "blue", color = "black") +
+          labs(title = "Box Plot \n[all variables]", x = "Variable", y = "Value") + 
+          theme(axis.text = element_text(size = 15), 
+                axis.ticks.length=unit(.25, "cm"),
+                axis.title=element_text(size=15,face="bold"),
+                plot.title = element_text(face="bold", size=20))
+      } else {
+        displayError()
+      }
+    } else {
+      if (!is.null(var) && is.numeric(data[[var]])) {
+        ggplot(data, aes_string(y = var)) +
+          geom_boxplot(fill = "blue", color = "black") +
+          labs(title = paste("Box Plot \n[", var, "]"), y = var) + 
+          theme(axis.text = element_text(size = 15), 
+                axis.ticks.length=unit(.25, "cm"),
+                axis.title=element_text(size=15,face="bold"),
+                plot.title = element_text(face="bold", size=20))
+      } else {
+        displayError()
+      }
+    }
+  }, height = 700, width = 700)
+  
+  
+  # -- Plot: QQ-Plot (ggplot2) ------------------
+  
+  output$qq <- renderPlot({
+    data <- selectedData()
+    var <- selectedVariable()
+    if (!is.null(var) && is.numeric(data[[var]])) {
+      ggplot(data, aes_string(sample = var)) +
+        geom_qq() +
+        geom_qq_line(color = "red") +
+        labs(title = paste("Q-Q Plot \n[", var, "]")) + 
+        theme(axis.text = element_text(size = 15), 
+              axis.ticks.length=unit(.25, "cm"),
+              axis.title=element_text(size=15,face="bold"),
+              plot.title = element_text(face="bold", size=20))
+    } else {
+      displayError()
+    }
+  }, height = 700, width = 700)
+  
+  # -- Plot: ECDF Plot --------------------------
+  
+  output$ecdf <- renderPlot({
+    data <- selectedData()
+    var <- selectedVariable()
+    if (!is.null(var) && is.numeric(data[[var]])) {
+      ggplot(data, aes_string(x = var)) +
+        stat_ecdf(geom = "step", color = "blue") +
+        labs(title = paste("ECDF Plot \n[", var, "]"), x = var, y = "ECDF") + 
+        theme(axis.text = element_text(size = 15), 
+              axis.ticks.length=unit(.25, "cm"),
+              axis.title=element_text(size=15,face="bold"),
+              plot.title = element_text(face="bold", size=20))
+    } else {
+      displayError()
+    }
+  }, height = 700, width = 700)
+  
+  # -- Plot: Mosaic Plot ---------------------
+  
+  #Fehlerbehandlung noch einbauen!!
   output$mosaic <- renderPlot({
     data <- selectedData()
     if (length(input$MosaicPlotColumns) == 0) {
@@ -241,7 +314,11 @@ server <- function(input, output, session) {
       }
   }, height = 700, width = 700)
   
-}
+  
+  
+  
+  
+} # End of Server Function
 
 
 
