@@ -125,7 +125,7 @@ plot(bootstrap_res1)
 
 ```
 
-Das Histogram der Bootstrap-Strichproben zeigt eine unimodale Verteilung mit einem zentralen Peak und guter Symmetrie. Wie bei dem t-test, zeigt auch Bootstrapping einen deutlichen Effekt des Training, sowohl für Konfidenzintervall 95% als auch 99%. Für das Konfidenzintervall von 99% liegt das Intervall der tatsächlichen Differenz (=Trainingseffekt) im Bereich [0.0700, 0.1178].   
+Das Histogram der Bootstrap-Strichproben zeigt eine unimodale Verteilung mit einem zentralen Peak und guter Symmetrie und der Q-Q-plot zeigt kaum Abweichungen von der theoretischen Normalverteilung. Wie bei dem t-Test, zeigt auch Bootstrapping einen deutlichen Effekt des Training, sowohl für Konfidenzintervall 95% als auch 99%. Für das Konfidenzintervall von 99% liegt das Intervall der tatsächlichen Differenz (=Trainingseffekt) im Bereich [0.0700, 0.1178].   
 
 
 ## Aufgabe 2
@@ -184,7 +184,7 @@ prop.test(c(children["Yes"],men["Yes"]),c(sum(children), sum(men)), alternative 
 Die Teststatisik beträgt X-squared = 54.16. Aufgrund des p-Wertes mit < 9.24e-14, kann die Nullhypothese auf dem 1% Niveau verworfen werden.
 
 --> Kinder hatten bessere Überlebenschancen als Männer.
-
+$\\$
 
 ERWEITERUNG - BAYES STATISTIK
 
@@ -202,7 +202,7 @@ df_Titanic_woman <- as.data.frame(bayesFit_Titanic_woman)
 
 ```
 
-Die Histogramme der posterior-Verteilungen zweigen unimodale, symmetrische Form mit geringer Streuung. Das Modell berrechnet eine mittlere Überlebenswahrscheinlichkeit für Kinder von 0.31, wobei das 99%-Konfidenzintervall  für die tatsächliche Wahrscheinlichkeit im Bereich [0.676,0.782] liegt. Für Männer wird eine Überlebenswahrscheinlichkeit von 0.212 errechnet, wobei das 99%-Konfidenzintervall im Bereich [0.188,0.236] liegt. Somit ergibt sich eine durchschnittliche Differenz der Überlebensraten von 0.519, mit einem 99%-Konfidenzintervall für die tatsächliche Differenz im Bereich [0.457, 0.574]. Frauen hatten somit deutlich höhere Überlebenschancen.
+Die Histogramme der A-posterior-Verteilungen zweigen unimodale, symmetrische Form mit geringer Streuung. Das Modell berrechnet eine mittlere Überlebenswahrscheinlichkeit für Frauen von 0.73, wobei das 99%-Konfidenzintervall  für die tatsächliche Wahrscheinlichkeit im Bereich [0.676,0.782] liegt. Für Männer wird eine Überlebenswahrscheinlichkeit von 0.212 errechnet, wobei das 99%-Konfidenzintervall im Bereich [0.188,0.236] liegt. Somit ergibt sich eine durchschnittliche Differenz der Überlebensraten von 0.519, mit einem 99%-Konfidenzintervall für die tatsächliche Differenz im Bereich [0.457, 0.574]. Frauen hatten somit deutlich höhere Überlebenschancen.
 
 
 ```{r Aufgabe2_Bayes_children}
@@ -215,7 +215,7 @@ df_Titanic_children <- as.data.frame(bayesFit_Titanic_children)
 
 ```
 
-Die Histogramme der posterior-Verteilungen zweigen eine unimodale, symmetrische Form, wobei die Streuung bei den Kindern deutlich größer ist als bei den Frauen oder Männern aufgrund der kleineren Stichprobengröße. Daraus ergibt sich auch die breitere Streuung der Differenzen. Das Modell berrechnet eine mittlere Überlebenswahrscheinlichkeit für Kinder von 0.731, wobei das 99%-Konfidenzintervall  für die tatsächliche Wahrscheinlichkeit im Bereich [0.676,0.782] liegt. Für Männer wird eine Überlebenswahrscheinlichkeit von 0.212 errechnet, wobei das 99%-Konfidenzintervall im Bereich [0.188,0.236] liegt. Somit ergibt sich eine durchschnittliche Differenz der Überlebensraten von 0.519, mit einem 99%-Konfidenzintervall für die tatsächliche Differenz im Bereich [0.457, 0.574]. Frauen hatten somit deutlich höhere Überlebenschancen. 
+Das Histogramm der A-posterior-Verteilung für Kinder zeigt eine unimodale, symmetrische Form, wobei die Streuung deutlich größer ist als bei den Frauen oder Männern aufgrund der kleineren Stichprobengröße. Daraus ergibt sich auch die breitere Streuung der Differenzen. Das Modell berrechnet eine mittlere Überlebenswahrscheinlichkeit für Kinder von 0.523, wobei das 99%-Konfidenzintervall für die tatsächliche Wahrscheinlichkeit im Bereich [0.405, 0.642] liegt. Somit ergibt sich eine durchschnittliche Differenz der Überlebensraten von 0.310, mit einem 99%-Konfidenzintervall für die tatsächliche Differenz im Bereich [0.187, 0.429]. Kinder hatten somit ebenfalls deutlich höhere Überlebenschancen. 
 
 
 ## Aufgabe 3
@@ -266,16 +266,15 @@ Die Teststatisik beträgt t = 6.4434. Der p-Wert liegt bei 1.774e-06, somit kann
 
 ERWEITERUNG - BAYES STATISTIK
 
-
 ```{r Aufgabe3_Bayes}
 
-bayesFit_growth <- bayes.t.test(growth_data, mu = 0.01, cred.mass = 0.99) #ALTERNATIVE???
+bayesFit_growth <- bayes.t.test(growth_data, mu = 0.01, cred.mass = 0.99)
 summary(bayesFit_growth)
 plot(bayesFit_growth)
 
 ```
 
-
+Das bayesianische Modell liefert einen a-posterior-Mittelwert von 0.107 mit 99%-HDI im Bereich von [0.062, 0.149]. Somit bietet das Medium einen deutlichen Wachstumsvorteil. 
 
 ## Aufgabe 4
 
@@ -323,7 +322,7 @@ plot(bayesFit_pathway99)
 
 ```
 
-.........
+Das bootstrapping Modell liefert einen theta-Wert von 0.597 bei einem 99%-HDI im Bereich [0.551, 0.645]. Die Anzahl der gefundenen Gene ist somit auf dem 1% Niveau signifikant höher als bei der vorhergehenden Studie, im Mittel um 0.048.
 
 
 ## Aufgabe 5
@@ -377,10 +376,8 @@ lines(density(comp2_woOut))
 
 
 ```
-Sowohl der Q-Q-Plot als auch der Shapiro-Test zeigen, dass die Gehälter von Firma2 im Gegensatz zu jenen der Firma 1 nicht normalverteilt sind. 
-Im Boxplot ist erkennbar, dass die Gehälter der Firma 1 deutlich breiter gestreut sind als jene von Firma 2, welche in einem engen Intervall um 2000 zu finden sind (mit der Ausnahme von 2 deutlichen Ausreißern, welche in weiterer Folge entfernt werden). 
-Aufgrund dieser Datenverteilung kann für die Analyse kein parametrischer Test verwendet werden. 
-.........
+Im Q-Q-Plot von Firma 2 sind zwei deutliche Ausreißer am rechten oberen Rand zu sehen, welche in weiterer Folge entfernt werden. Der Q-Q-Plot und das Histogramm zu den Daten von Firma 1 zeigen jeweils 2 Modi, somit kann der Shapiro-Test nicht angewandt werden und von Normalverteilung ist nicht auszugehen. 
+Aufgrund dieser Datenverteilung ist kein statistischer Test anwendbar und es muss auf simulations-basierte Methoden zurückgegriffen werden.
 
 ERWEITERUNG - BOOTSTRAPPING
 
@@ -420,5 +417,6 @@ plot(boot_res5)
 
 ```
 
-.........
+Das Histogram der Bootstrap-Strichproben zeigt eine unimodale Verteilung mit einem zentralen Peak nahe Null und guter Symmetrie und der Q-Q-plot zeigt kaum Abweichungen von der theoretischen Normalverteilung. Bootstrapping liefert ein 99%-Konfidenzintervall für die tatsächlich Differenz im Bereich von [-878, 878], somit kann kein signifikanter Unterschied zwischen den Gehältern der beiden Firmen festgestellt werden. 
+
 
