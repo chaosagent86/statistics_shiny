@@ -14,7 +14,7 @@ library(car) # Datensatz UN
 
 # ---- vermutlich nicht mehr benötigte packages ------------------
 # library(brochure)
-# library(vcd)
+library(vcd)
 
 #Server code of the app
 server <- function(input, output, session) {

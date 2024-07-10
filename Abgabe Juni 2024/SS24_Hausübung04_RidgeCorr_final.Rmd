@@ -1,0 +1,1251 @@
+---
+title: "Hausübung 04 - Lineare Regression"
+author: "Baier Sebastian, Figlmüller Magdalena, Schwarzböck Alice"
+date: "13.06.2024"
+output: 
+  pdf_document: 
+    toc: yes
+    toc_depth: 5
+---
+
+# Allgemeine Hinweise zur Übung
+
+**Für alle Beispiele gelten folgende Aufgabenstellungen:**
+
+* Überprüfen Sie alle erforderlichen statistischen Voraussetzungen für die Gültigkeit dieses Modells mithilfe der quality plots der Residuen und gegebenenfalls Scatterplots.
+* Führen Sie eine Modellselektion durch und wählen anhand statistischer Kriterien ein optimales Modell aus. Argumentieren Sie anhand Kriterien für die Signifkanz von Koeffizienten und gegebenenfalls zusätzlich von Modellen.
+* Schreiben Sie das Regressionsmodell und die angepasste Modellgleichung des optimalen Modells explizit an.
+* Interpretieren Sie die Werte die Koeffizienten im Sachzusammenhang.
+
+# Aufgabe 1: Datentransformation
+
+## 1.1 Aufgabenstellung
+
+Wählen Sie den Datensatz UN aus der library 'car'. Filtern Sie erst 'NA' mit der Funktion na.omit. Erklären Sie dann infant mortality durch gross domestic product. Explorieren Sie die Daten, bevor Sie ein Modell anpassen.
+
+```{r setup, include=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(magrittr)
+library(car)
+library(ggplot2)
+library(gridExtra)
+library(psych)
+```
+
+## 1.2 Beschreibung des Datensatzes
+
+Es folgt eine kurze Beschreibung des Datensatzes, ehe die beiden Zielvariablen (Säuglinssterblichkeit/Infant Mortality und Bruttoinlandsprodukt/GDP) genauer untersucht und anschließend für die Erstellung eines Regressionsmodells herangezogen werden.
+
+* **region:** umfasst die Weltregionen Afrika, Asien, Karibik, Europa, Lateinamerika, Nordamerika, Nordatlantik und Ozeanien.
+* **group:** ist ein beschreibender Faktor, demzufolge Länder der OECD (Organization for Economic Co-operation and Development), Afrika oder anderen Ländern (other) zugeordnet sind.
+* **fertility:** beschreibt die Fruchtbarkeitsrate als Anzahl der Kinder pro Frau.
+* **ppgdp:** das per capita gross domestic product (GDP) beschreibt das Bruttoinlandsprodukt in US-Dollar.
+* **lifeExpF:** beschreibt die Lebenserwartung von Frauen in Jahren.
+* **pctUrban:** beschreibt den Stadtanteil in Prozent.
+* **infantMortality:** beschreibt die Zahl der Todesfälle bei Säuglingen vor dem 1. Geburtstag je 1.000 Lebendgeburten.
+
+Als erster Schritt wurde der Datensatz mittels na.omit gefiltert um Zeilen mit fehlenden Werten zu entfernen. Glimpse liefert einen Einblick in die Datenstruktur und Summary gibt eine Übersicht über Minima, Maxima, Median und die 1.+3. Quantile der beiden Zielvariablen "Infant Mortality" und "GDP":
+
+```{r aufg1-1, echo=TRUE}
+UN_new <- UN %>% na.omit()
+glimpse(UN_new)
+summary(UN_new$infantMortality)
+summary(UN_new$ppgdp)
+```
+
+Mit na.omit wurden aus den Originaldaten (`r nrow(UN)` Zeilen) insgesamt `r nrow(UN)-nrow(UN_new)` Zeilen herausgefiltert.
+
+Hinsichtlich der Variable **Infant Mortality** fällt auf, dass der **arithmetische Mittelwert (`r options(digits=3); mean(UN_new$infantMortality)`)** deutlich vom **Median (`r median(UN_new$infantMortality)`)** abweicht.
+
+Dies macht sich bei der Variable **GDP** noch deutlicher bemerkbar: Hier beträgt der **arithmetische Mittelwert `r options(digits=3);mean(UN_new$ppgdp)`** und der **Median** liegt bei **`r median(UN_new$ppgdp)`**.
+
+In beiden Fällen deutet der Unterschied zwischen Mittelwert und Median auf eine möglicherweise schiefe Datenlage hin, was im Anschluss mittels explorativer Datenanalyse verdeutlicht wird.
+
+## 1.3 Explorative Analyse: Infant Mortality
+```{r infant_plots, message=FALSE, warning=FALSE, include=FALSE, echo=FALSE}
+
+infantMortality_hist <- ggplot(UN_new, aes(x = `infantMortality`))+
+  geom_histogram(aes(x = `infantMortality`, y = ..density..),breaks = seq(0, 130, by = 10), fill = "grey", color = "black")+
+  geom_density(aes(x = `infantMortality`, y = ..density.. ),color = "red")+
+  theme_classic()+
+  ggtitle("Histogram Infant Mortality")+
+  xlab("Infant Mortality [per 1000]")+
+  ylab("Density")+
+  scale_x_continuous(breaks=seq(0,130,by=20))+ 
+  scale_y_continuous(breaks=seq(0.00,0.03,by=0.01))+
+  theme(plot.title = element_text(hjust = 0.5))
+infantMortality_hist
+
+infantMortality_qqplot <- ggplot(UN_new, aes(sample=UN_new$infantMortality))+
+  stat_qq()+
+  stat_qq_line(colour = "red")+
+  theme_classic()+
+  ggtitle("Q-Q-Plot Infant Mortality")+
+  xlab("Theoretical Quantiles")+
+  ylab("Sample Quantiles")+
+  scale_y_continuous(breaks=seq(-50,130,by=25))+
+  theme(plot.title = element_text(hjust = 0.5))
+infantMortality_qqplot
+
+infantMortality_violin <- ggplot(UN_new, aes(x=1, y=UN_new$infantMortality))+
+  geom_violin(trim = FALSE, fill = "lightgrey", width = 1)+
+  geom_boxplot(width = 0.15)+
+  theme_classic()+
+  ggtitle("Violinplot Infant Mortality")+
+  labs(x= "y", y = "Infant Mortality [per 1000]")+
+  coord_flip()+
+  scale_y_continuous(limits=c(0,130), breaks=seq(0,130,20))+
+  scale_x_continuous(breaks=seq(0,130,20))+ 
+  theme(plot.title = element_text(hjust = 0.5), axis.title.y = element_text(size = 30, color="white"), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+infantMortality_violin
+
+infantMortality_ecdf <- ggplot(UN_new, aes(UN_new$infantMortality))+
+  stat_ecdf(geom = "step")+
+    theme_classic()+
+  ggtitle("ECDF Infant Mortality")+
+  labs(x= "Infant Mortality [per 1000]", y = "Frequency")+
+  scale_x_continuous(limits=c(0,130), breaks=seq(0,130,20))+
+  theme(plot.title = element_text(hjust = 0.5))
+infantMortality_ecdf
+
+library(gridExtra)
+png("infantMortality_dataexp_plots.png", width = 7, height =6, units ='in', res = 900)
+infantMortality_dataexp_plots <- grid.arrange(infantMortality_hist, infantMortality_qqplot, infantMortality_violin, infantMortality_ecdf, nrow=2)
+dev.off()
+```
+
+```{r infant_plots2, include=FALSE, message=FALSE, warning=FALSE, eval=FALSE, fig.height=4}
+
+infantMortality_dataexp_plots
+
+```
+
+\includegraphics{infantMortality_dataexp_plots.png}
+
+Anhand der vier Plots lässt sich feststellen, dass es sich hinsichtlich der Variable Infant Mortality um **unimodale, rechtsschiefe Daten** handelt:
+
+* das **Histogramm** deutet auf einen leichten (rasch ansteigenden) linken Rand und einen schweren (langsam auslaufenden) rechten Rand hin. Dies ist plausibel, da die Daten mit 0 ein striktes unteres Limit haben, was nach oben hin nicht der Fall ist.
+* der **Q-Q-Plot** bestätigt dies, da der linke Rand zur imaginären Referenzmitte hin und der rechte Rand von der Referenzmitte weg "gebogen" ist. 
+* der **Violin-/Boxplot** spiegelt diesen Trend ebenfalls wider. Zudem ist der im Vergleich zum Mittelwert (`r mean(UN_new$infantMortality)`) nach links verzerrte Median (`r median(UN_new$infantMortality)`) im Boxplot deutlich sichtbar. Bei den beiden rechts außerhalb des 3. Quantils liegenden Datenpunkten handelt es sich aufgrund der schiefen Datenlage nicht zwingend um Ausreißer.
+* auch der **ECDF Plot** weist mit der anfänglich starken und später abflachenden Steigung ebenfalls auf eine rechtsschiefe Datenlage hin. Eindeutige Ausreißer sind nicht erkennbar. 
+
+Die schiefe Datenlage wird auch durch die Skewness von `r psych::skew(UN_new$infantMortality)` bestätigt. 
+
+## 1.4 Explorative Analyse: Gross Domestic Product (GDP)
+
+```{r GDP_plots, message=FALSE, warning=FALSE, include=FALSE, echo=FALSE}
+
+GDP_hist <- ggplot(UN_new, aes(x = `ppgdp`))+
+  geom_histogram(aes(x = `ppgdp`, y = ..density..),bins = 15, fill = "grey", color = "black")+
+  geom_density(aes(x = `ppgdp`, y = ..density.. ),color = "red")+
+  theme_classic()+
+  ggtitle("Histogram GDP")+
+  xlab("GDP [US $]")+
+  ylab("Density")+
+  scale_x_continuous(breaks=seq(0,106000,by=25000))+ 
+  theme(plot.title = element_text(hjust = 0.5))
+GDP_hist
+
+GDP_qqplot <- ggplot(UN_new, aes(sample=UN_new$ppgdp))+
+  stat_qq()+
+  stat_qq_line(colour = "red")+
+  theme_classic()+
+  ggtitle("Q-Q-Plot GDP")+
+  xlab("Theoretical Quantiles")+
+  ylab("Sample Quantiles")+
+  scale_y_continuous(breaks=seq(0,106000,by=25000))+
+  theme(plot.title = element_text(hjust = 0.5))
+GDP_qqplot
+
+GDP_violin <- ggplot(UN_new, aes(x=1, y=UN_new$ppgdp))+
+  geom_violin(trim = FALSE, fill = "lightgrey", width = 1)+
+  geom_boxplot(width = 0.15)+
+  theme_classic()+
+  ggtitle("Violinplot GDP")+
+  labs(x= "y", y = "GDP [US $]")+
+  coord_flip()+
+  scale_y_continuous(limits=c(0,106000), breaks=seq(0,106000,25000))+
+  scale_x_continuous(breaks=seq(0,106000,25000))+ 
+  theme(plot.title = element_text(hjust = 0.5), axis.title.y = element_text(size = 30, color="white"), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+GDP_violin
+
+GDP_ecdf <- ggplot(UN_new, aes(UN_new$ppgdp))+
+  stat_ecdf(geom = "step")+
+  theme_classic()+
+  ggtitle("ECDF GDP")+
+  labs(x= "GDP [US $]", y = "Frequency")+
+  scale_x_continuous(limits=c(0,106000), breaks=seq(0,106000,25000))+
+  theme(plot.title = element_text(hjust = 0.5))
+GDP_ecdf
+
+library(gridExtra)
+png("GDP_dataexp_plots.png", width = 7, height =6, units ='in', res = 900)
+GDP_dataexp_plots <- grid.arrange(GDP_hist, GDP_qqplot, GDP_violin, GDP_ecdf, nrow=2)
+dev.off()
+```
+
+```{r GDP_plots2, include=FALSE, message=FALSE, warning=FALSE, eval=FALSE, fig.height=4}
+
+GDP_dataexp_plots
+
+```
+
+\includegraphics{GDP_dataexp_plots.png}
+
+Anhand der vier Plots lässt sich feststellen, dass es sich hinsichtlich der Variable GDP ebenfalls um unimodale, **rechtsschiefe Daten** handelt:
+
+* das **Histogramm** deutet auch hier einen leichten linken Rand und einen schweren rechten Rand an. Wieder haben die Daten mit 0 ein striktes unteres Limit, was nach oben hin nicht der Fall ist.  Es zeigt sich, dass die Daten zwar sehr weit verteilt sind, jedoch ab etwa 60.000 US-Dollar gegen Null tendieren. 
+* der **Q-Q-Plot** bestätigt den leichten linken und schweren rechten Rand, da der linke Rand zur imaginären Referenzmitte hin und der rechte Rand von der Referenzmitte weg "gebogen" ist. Am rechten Rand ist ein möglicher Ausreißer erkennbar.
+* der **Violin-/Boxplot** spiegelt die rechtsschiefe Datenlage ebenfalls wider. Der im Vergleich zum Mittelwert (`r mean(UN_new$ppgdp)`) nach links verzerrte Median (`r median(UN_new$ppgdp)`) ist auch hier im Boxplot deutlich sichtbar. Bei den außerhalb des 3. Quantils liegenden Datenpunkten handelt es sich aufgrund der schiefen Datenlage nicht zwingend um Ausreißer.
+* auch der **ECDF Plot** weist mit der anfänglich starken und später abflachenden Steigung auf eine rechtsschiefe Datenlage hin. Aufgrund des langen Abstandes zwischen dem vorletzten und letzten Datenpunkt kann der letzte Datenpunkt möglicherweise als Ausreißer eingestuft werden. 
+
+Die schiefe Datenlage wird auch durch die Skewness von `r psych::skew(UN_new$ppgdp)` bestätigt. 
+
+## 1.5 Korrelations- und Lineritätscheck zwischen Infant Mortality und GDP
+### Datentransformation durch Logarithmieren
+
+Die o.g. rechtschiefe Datenlage deutet darauf hin, dass die Daten vor der Modellierung durch Logarithmieren transformiert werden müssen. Um den Unterschied zu veranschaulichen, sind in Folge die beiden Variablen in ihrer originalen Form bzw. in logarithmierter Form gegeneinander geplottet:
+
+```{r CorInfantGDP_plot , echo=FALSE, message=FALSE, fig.height=3.5}
+
+plot(x=UN_new$infantMortality, y=UN_new$ppgdp, xlab = "Infant Mortality [per 1000]", ylab = "GDP [US $]", main = "Scatterplot der Originaldaten")
+
+```
+
+```{r CorInfantGDP_plot_log, echo=FALSE, message=FALSE, fig.height=3.5}
+
+plot(x=log(UN_new$infantMortality), y=log(UN_new$ppgdp), xlab = "log Infant Mortality [per 1000]", ylab = "log GDP [US $]", main = "Scatterplot der logarithmierten Daten")
+
+```
+
+Wie im ersten Scatterplot ersichtlich, sind die Originaldaten aufgrund der schweren Ränder der x- und y-Variablen kurvenförmig angeordnet. Bei dieser Datenverteilung ergibt es wenig Sinn, ohne vorhergehende Transformation eine Regressionsgerade durch die Datenwolke zu legen. Die Kurvenform ließ sich allerdings durch logarithmieren der beiden Variablen beheben. Die Anordnung der logarithmierten Datenpunkte deutet einen negativen linearen Zusammenhang zwischen Infant Mortality und GDP an, worauf im Anschluss mittels Pearson-Korrelation getestet wurde:
+
+```{r CorInfantGDP, include=TRUE, echo=FALSE, message=FALSE , warning=FALSE, comment=">"}
+cor.test(log(UN_new$infantMortality), log(UN_new$ppgdp))
+pear_log_Infant_gdp <- cor.test(log(UN_new$infantMortality), log(UN_new$ppgdp))
+```
+Die Pearson-Korrelation ergibt einen Wert von `r pear_log_Infant_gdp$estimate`. Dies bestätigt obige Annahme eines Zusammenhangs zwischen niedriger Infant Mortality bei hohem GDP.
+
+Auch der p-Wert < 2.2e-16 zeigt, dass die Nullhypothese (H0 = keine Korrelation) verworfen werden kann. 
+
+Für die Modellanpassung werden die logarithmierten Daten verwendet. 
+
+### Modellanpassung mit logarithmierten Daten
+
+```{r, include=TRUE, comment=">"}
+log.lm <- lm(log(UN_new$infantMortality)~log(UN_new$ppgdp))
+summary(log.lm)
+```
+Hier gilt:
+
+* H0: kein linearer Zusammenhang
+* H1: linearer Zusammenhang
+
+Die Summary der Residuen sagt aus, dass der Fehler mit einem Median von -0.0235 im Mittel sogut wie bei Null liegt - somit kann ein systematischer Fehler ausgeschlossen werden. Die Modellkoeffizienten a (Intercept) und b (Steigung) sind ungleich 0. Dies deutet darauf hin, dass tatsächlich ein sinnvoller linearer Zusammenhang existiert.
+
+Die F-Statistik (625.9) und der p-Wert von < 2.2e-16 lassen ein Verwerfen der Nullhypothese zu. Die Korrelation (R²) zwischen den tatsächlichen Datenpunkten und den zugehörigen Werten auf der Regressionsgeraden liegt bei 0.765, was aussagt, dass von den abhängigen Variablen ca. 76% der Varianz durch dieses lineare Modell erklärt werden können. Der Standardfehler der Residuen beträgt 0.5281 bei 191 Freiheitsgraden (=bei 193 Beobachtungen).
+
+### Überprüfung der Residuen 
+
+```{r residuals1_log, fig.height=8, fig.width=8, echo=FALSE, warning=FALSE, fig.align='center'}
+par(mfrow = c(2, 2))
+plot(log.lm)
+```
+
+* **Residuals vs Fitted:** Die Residuen sind homoskedastisch. Sie sind auch um den 0-Wert zentriert, was auf keinen systematischen Fehler hinweist. Zudem sind die Residuen nicht korreliert und beeinflussen sich nicht gegenseitig. **Die Voraussetzungen für Regression sind daher erfüllt.**
+* **Normal Q-Q:** Die Residuen liegen zum Großteil auf der Linie. Da sie sich am rechten Rand eindeutig nach oben abheben (schwerer Rand), sind die **Residuen nicht normalverteilt**. Das Regressionsmodell bleibt somit zwar gültig, jedoch darf kein t-Test durchgeführt werden. Auf der rechten Seite zeigt sich ein Ausreißer (54) - dieser sollte bei dem Datenumfang allerdings kein Problem darstellen. Der Großteil der Daten (min. 95%) liegt innerhalb des angemessenen Intervalls von [-2,2] Standardabweichungen.
+* **Scale-Location:** Es sind keine systematischen Verläufe erkennbar und die Residuals wirken homoskedastisch.
+* **Residuals vs Leverage:** Dieser Plot ermöglicht die Bewertung von Ausreißern bei der Regression (zweidimensionale Deklaration). Die Datenpunkte liegen innerhalb der Cook's distance, wodurch sich kein starker (negativer) Hebeleffekt erkennen lässt. Zwar ist ganz rechts ein Punkt zu sehen, dieser liegt allerdings nur knapp neben der Linie und hätte daher eher einen positiven Hebeleffekt (im Gegensatz zu solchen Residuals, welche außerhalb der Cooks-Distance liegen würden). Dieser Plot zeigt auch, dass der im Q-Q Plot ersichtliche Ausreißer (54) nicht entfernt werden muss, da er den Verlauf der Geraden nicht maßgeblich beeinflusst bzw. die Gerade nicht aushebelt.
+
+### Erstellung der Modell-Gleichung
+
+* **Allgemeine Regressionsgleichung:** 
+
+$$yreg(i) = a + b *xreg(i) + \epsilon(i)$$
+
+* **Modell-Gleichung:** 
+
+$$log(yreg) = 8.10377 - 0.61680 \cdot log(xreg)$$
+
+$$log(infantMortality) = 8.10377 - 0.61680 \cdot log(ppgdp)$$
+* **Dabei gilt:** 8.10377 ist die Intercept und -0.61680 ist die Steigung.
+
+### Scatterplot mit Regressionsgeraden
+
+```{r , echo=FALSE, fig.height=3.5}
+plot(log(UN_new$ppgdp), log(UN_new$infantMortality), main="Scatterplot der log Daten mit Modell-Linie", ylab = "log Infant Mortality [per 1000]", xlab = "log GDP [US $]" ) 
+abline(log.lm, col = "red", lwd = 2)
+```
+
+### Umkehrung der linearen Transformation
+
+Um wieder zu den Originaldaten zurückzugelangen, muss das durch Logarithmierung erstellte Modell wieder umgeformt werden. 
+
+**Hierfür gilt:**
+
+$$exp(log(infantMortality))= exp(-0.61680 * log(ppgdp) + 8.10377)$$
+
+$$infantMortality = ppgdp^{-0.61680}*exp(8.10377)$$
+
+**Die Funktion für das Modell der Original-Daten lautet somit:**
+
+$$ppgdp = 3306.912 \cdot (infantMortality)^{-0.61680}$$
+
+Durch betrachten der Gleichung wird ersichtlich, dass wenn die Säuglingssterblichkeit (x-Achse) auf Null gehen würde, das Bruttoinlandsprodukt (y-Achse) unendlich gross wäre. Zudem bedeutet eine Erhöhung der Säuglingssterblichkeitsrate um 1, dass das Bruttoinlandsprodukt um das 3306.912-fache sinkt.
+
+```{r, echo=FALSE, fig.height=3.5}
+plot(UN_new$ppgdp, UN_new$infantMortality,ylab = "Infant Mortality [per 1000]", xlab = "GDP [US $]", main = "Scatterplot der Originaldaten mit Modell_Linie")
+curve (exp(log.lm$coefficients[2]*log(x) + log.lm$coefficients[1]), add=TRUE, col = "red", lwd = 2)
+```
+
+\pagebreak
+
+# Aufgabe 2: Schweiz
+
+## 2.1 Aufgabenstellung
+
+* Wir kehren zurück zu den Variablen “Fertility”, “Agriculture”, “Education”, “Catholic” und “Infant Mortality” aus dem R Datensatz swiss des R package utils.
+* Passen Sie für die oben genannten Variablen ein Modell an, das Education durch die übrigen Variablen erklärt, soweit dies zulässig ist.
+
+```{r swiss0}
+library(utils)
+str(swiss)
+summary(swiss)
+```
+
+```{r swiss1, include = FALSE}
+plot(swiss)
+```
+In dieser Aufgabenstellung geht es darum, das optimale lineare Modell zu finden um die Variable Education durch die übrigen Variablen zu beschreiben. Hierfür müssen allerdings zuerst die statistischen Voraussetzungen überprüft bzw. evaluiert werden.
+
+## 2.2 Überprüfung der statistischen Voraussetzungen
+
+### Überprüfung auf Unabhängigkeit der Kovariablen
+
+``` {r echo=FALSE, include = FALSE, comment=">", fig.height= 8, fig.width= 8, warning=FALSE}
+cor(swiss)
+
+```
+
+``` {r echo=FALSE, comment=">", fig.height= 8, fig.width= 8, warning=FALSE}
+panel.hist <- function(x, ...)
+{
+usr <- par("usr"); on.exit(par(usr))
+par(usr = c(usr[1:2], 0, 1.5) )
+h <- hist(x, plot = FALSE)
+breaks <- h$breaks; nB <- length(breaks)
+y <- h$counts; y <- y/max(y)
+rect(breaks[-nB], 0, breaks[-1], y, col = "cyan", ...)
+}
+
+panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
+{
+usr <- par("usr"); on.exit(par(usr))
+par(usr = c(0, 1, 0, 1))
+r <- abs(cor(x, y))
+txt <- format(c(r, 0.123456789), digits = digits)[1]
+txt <- paste0(prefix, txt)
+if(missing(cex.cor)) cex.cor <- 0.8/strwidth(txt)
+text(0.5, 0.5, txt, cex = cex.cor * r, col = ifelse(r>0.5,2,1))
+}
+
+pairs(swiss, lower.panel = panel.smooth, upper.panel = panel.cor, diag.panel = panel.hist,las=1)
+```
+Aus dem Scatterplot sehen wir, dass die Variable **Examination** mit fast allen Variablen hoch (R >= 0.5) korreliert. Da dies für eine Modellbildung als erklärende Variable nicht zulässig ist, wird diese aus dem Datensatz entfernt und die übrigen Daten via Scatterplot nochmalig geprüft.
+
+``` {r echo=FALSE, comment=">", fig.height= 8, fig.width = 8, warning=FALSE}
+data <- swiss %>% select(-Examination)
+
+panel.hist <- function(x, ...)
+{
+usr <- par("usr"); on.exit(par(usr))
+par(usr = c(usr[1:2], 0, 1.5) )
+h <- hist(x, plot = FALSE)
+breaks <- h$breaks; nB <- length(breaks)
+y <- h$counts; y <- y/max(y)
+rect(breaks[-nB], 0, breaks[-1], y, col = "cyan", ...)
+}
+
+panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
+{
+usr <- par("usr"); on.exit(par(usr))
+par(usr = c(0, 1, 0, 1))
+r <- abs(cor(x, y))
+txt <- format(c(r, 0.123456789), digits = digits)[1]
+txt <- paste0(prefix, txt)
+if(missing(cex.cor)) cex.cor <- 0.8/strwidth(txt)
+text(0.5, 0.5, txt, cex = cex.cor * r, col = ifelse(r>0.5,2,1))
+}
+
+pairs(data, lower.panel = panel.smooth, upper.panel = panel.cor, diag.panel = panel.hist,las=1)
+```
+Zwischen den erklärenden Variablen (ausgenommen Education, welche erklärt werden soll) ist nach Entfernung der Variable Examination keine Korrelation mehr erkennbar. Da die Grundvoraussetzung, dass Kovariablen nicht miteinander korrelieren dürfen (R < 0.5) nun erfüllt ist, kann mit diesem Datensatz weitergearbeitet werden. 
+
+``` {r include=FALSE, message=FALSE, echo=FALSE, comment=">", fig.height= 5, fig.width = 5}
+# nicht mehr inkludiert da kein Mehrwert, die Info ist im Vorhergehenden Scatterplot enthalten
+explanatory<-data %>% select(-Education)
+plot(explanatory)
+cor(explanatory)
+```
+
+### Überprüfung der Residuen
+
+``` {r echo=TRUE, comment=">", fig.height= 5, fig.width = 5}
+modell <- lm(Education ~ ., data)
+```
+
+```{r residuals2, fig.height=8, fig.width=8, echo=FALSE, warning=FALSE, fig.align='center'}
+par(mfrow = c(2, 2))
+plot(modell)
+```
+
+``` {r echo=TRUE, comment=">", fig.height= 5, fig.width = 5}
+summary(modell)
+```
+
+Anhand der oben angeführten Summary und Plots kann überprüft werden, ob nachfolgende Anforderungen für eine multiple lineare Regression erfüllt sind: 
+
+* Das Modell besitzt keinen systematischen Fehler: **Ja**, die Lage des Medians (-0.7571), welcher Nähe Null liegt, deutet darauf hin, dass die Residuen um Null herum zentriert sind. Diese Bedingung scheint daher erfüllt.
+* Die Fehlervarianz ist für alle Beobachtungen in etwa gleich groß (homoskedastisch): **Ja**, der Residual vs. Fitted und der Scale-Location Plot deuten dies an, wobei die Datenpunkte nicht so gleichmäßig um die 0-Linie angesiedelt sind wie das bei Beispiel 1 der Fall war.
+* Die Residuen sind unabhängig, bzw. gleichartig verteilt: **Ja**, im Residual vs. Fitted Plot lässt sich kein eindeutiger Trend in der Verteilung erkennen. 
+* Die Residuen sind normalverteilt: **Nein**, im Q-Q Plot ist erkennbar, dass die Residuen schwere Ränder aufweisen und somit streng genommen **nicht normalverteilt** sind. Der Großteil der Werte liegt jedoch auf der Geraden, weshalb möglicherweise dennoch einige Tests für Normalverteilung in Frage kommen (?)
+* Es gibt keine lineare Abhängigkeit zwischen den Regressoren: **Ja**, dies wurde anhand der Korrelations-Scatterplots und der Korrelationskoeffizienten (< 0.5) aufgezeigt.
+
+Es sind daher alle notwendigen Bedingungen für das Erstellen eines Regressionsmodells erfüllt. 
+
+Im **Residuals vs. Leverage Plot**, der Ausreißer bei Regressionsmodellen aufzeigt, fallen jedoch diverse Dinge auf: So existiert ein Punkt ziemlich am Ende mit einer hohen Hebelwirkung, welche allerdings nicht negativ ist. Die Punkte Sierre und Porrentuy liegen etwas symmetrisch und innerhalb der Hooks-Distance und müssen daher auch nicht entfernt werden. Kritisch ist allerdings der Punkt V. De Geneve, welcher außerhalb der Hooks-Distance liegt, daher eine große (negative) Hebelwirkung zeigt und daher möglicherweise entfernt werden muss.
+
+## 2.3 Erstellen des Modells
+
+Wir erstellen daher nun ein Modell, welches den Punkt "V. De Geneve" nicht mehr enthält und schauen, wie gut unser Modell funktioniert. 
+
+**Modell #1: Punkt "V. De Geneve" entfernt, alle Spalten bis auf Examination enthalten**
+``` {r echo=TRUE, comment=">", fig.height= 4}
+data <- swiss %>% select(-Examination)
+neudata=rbind(data[1:44,],data[46:47,])
+neumodell <- lm(Education ~ ., neudata)
+summary(neumodell)
+```
+Wir stellen hier zum einen fest, dass unser Modell nur relativ unzureichend ist mit einem Multiple R-squared:  0.6299 sowie Adjusted R-squared:  0.5938. Weiters stellen wir fest, dass die Spalte "Infant.Mortality" zum Modell nichts beiträgt (p=0.34170), und daher in Folge entfernt wird. 
+
+**Modell #2: Punkt "V. De Geneve" entfernt, alle Spalten bis auf Examination und Infant Mortality enthalten**
+
+``` {r echo=TRUE, comment=">", fig.height= 4}
+data2 <- swiss %>% select(-Examination, -Infant.Mortality)
+neudata2=rbind(data2[1:44,],data2[46:47,])
+neumodell2 <- lm(Education ~ ., neudata2)
+summary(neumodell2)
+```
+Interessanterweise wurde unser Modell etwas schlechter (Multiple R-squared:  0.6216,	Adjusted R-squared:  0.5945; wobei wir uns erstmal auf den R2-Wert beziehen), obwohl wir die Spalte Infant Mortality entfernt hatten. Dies erscheint uns etwas paradox, da wir uns eigentlich ein deutlich besser angepasstes Modell erwartet hatten. Unsere Überlegung ist daher, den Hebelpunkt "V. De Geneve" doch in unseren Daten zu lassen in der Hoffnung auf ein besser angepasstes Ergebnis. Dies wird nun getestet.
+
+**Modell #3: Punkt "V. De Geneve" behalten, alle Spalten bis auf Examination und Infant Mortality enthalten**
+
+``` {r echo=TRUE, comment=">", fig.height= 4}
+data2 <- swiss %>% select(-Examination, -Infant.Mortality)
+neumodell3 <- lm(Education ~ ., data2)
+summary(neumodell3)
+```
+Aus den R2 sowie den R2-adjusted Werten ist zu erkennen, dass es sich bei dem Modell ohne der Variable "Infant Mortality" sowie inklusive dem Wert "V. De Geneve" um das Beste Modell handelt, welches wir erstellt hatten. 
+
+Wir zeigen nun daher die Formel für das Regressionsmodell.
+
+### Regressionsmodell
+
+Das daraus reslultierende Regressionsmodell lautet: 
+$$Education_i = \alpha + \beta_{Fertility} \times x_{Fertility,i} + \beta_{Agriculture} \times x_{Agriculture,i} + \beta_{Catholic} \times x_{Catholic,i} + \varepsilon_i$$
+
+### Modellgleichung
+
+Die angepasste Modellgleichung ist: 
+$$Education_i = 53.8505 + -0.48883 \times x_{Fertility,i} + -0.23799 \times x_{Agriculture,i} + 0.08440 \times x_{Catholic,i}$$
+
+## 2.4 Interpretation der Koeffizienten
+
+Der intercept alpha bedeutet, dass 45.2686% der Bevölkerung eine Ausbildung höher als die der Grundschule hätte wenn... 
+
+* die Bevölkerung komplett unfruchtbar wäre,
+* kein Mann mehr in der Landwirtschaft tätig wäre, und 
+* niemand katholisch wäre.  
+
+Die einzelnen Beta-Koeffizienten stellen dar wie stark (prozentual) die Bevölkerung mit einer Ausbildung höher als die der Grundschule steigen würde, vorausgesetzt das dazugehörige Maß steigt um 1% während die anderen gleich bleiben.
+
+Das bedeutet für 1% mehr in der "common standardized fertility measure" sind es 0.48883% weniger, für 1% mehr Männer in der Landwirtschaft 0.23799% weniger und für 1% mehr Katholiken sind es 0.08440% mehr Menschen mit einer höheren Ausbildung als Grundschulausbldung. 
+
+## 2.5 Erweiterung: LASSO Regression
+
+LASSO-Regression (Least Absolute Shrinkage and Selection Operator) ist eine Methode der linearen Regression, die durch L1-Regularisierung eine Strafe für die Summe der absoluten Werte der Regressionskoeffizienten hinzufügt, wodurch einige Koeffizienten auf Null gesetzt werden können. Das führt zu einer Schrumpfung der Koeffizienten und ermöglicht die Auswahl der wichtigsten Variablen, wodurch das Modell vereinfacht und die Überanpassung reduziert werden soll.
+
+Diese Methode wurde verwendet, um die Vorhersage-Genauigkeit des Modells zu erhöhen bzw. zu automatisieren. Um die Datenvoraussetzung zu erfüllen, wurde vorab die mit anderen Kovariablen korrelierende Examination-Variable entfernt.
+
+```{r lasso1, echo=TRUE, message=FALSE, warning=FALSE, comment=">", fig.height = 3.5}
+library(glmnet)
+library(caret)
+
+data <- swiss %>% select(-Examination)
+
+# Unabhängige Kovariablen
+x <- as.matrix(swiss[, c("Fertility", "Agriculture", "Catholic", "Infant.Mortality")])
+
+# Zielvariable
+y <- swiss$Education
+
+# Plot 1: Koeffizienten aller inkludierten Kovariablen vs. Log Lambda
+lambda.grid <- 10^seq(-5,5, length=100)
+fitL <- glmnet(x=x, y=y, alpha=1, lambda= lambda.grid)
+plot(fitL,xvar="lambda",label=TRUE, main = "LASSO (100 %) \n")
+
+# LASSO mit Kreuzvalidierung
+lasso_model <- cv.glmnet(x, y, alpha = 1)
+
+# Plot 2: Kreuzvalidierungsfehler
+plot(lasso_model, main = "LASSO (100 %) Regularisierungsparameter  \n")
+
+# Bestes Lambda
+best_lambda <- lasso_model$lambda.min
+best_lambda
+
+# Endgültiges LASSO-Modell
+final_lasso_model <- glmnet(x, y, alpha = 1, lambda = best_lambda)
+
+# Koeffizienten des endgültigen Modells
+coef(final_lasso_model)
+
+```
+**Interpretation der Plots**
+
+Die **erste Grafik (Koeffizienten vs. Log Lambda)** zeigt, dass die den verschiedenen Kovariablen zugehörigen Koeffizienten an unterschiedlichen Stellen rapide nach Null abfallen oder aufsteigen. Wenn die Null-Linie erreicht ist, wird die Variable aus dem Modell ausgeschlossen. 
+
+Die x-Achse der **zweiten Grafik (Plot des cv.glmnet-Objekts)** zeigt die Werte des Regularisierungsparameters log(lambda), der die Stärke der Regularisierung steuert. Ein höherer Wert von lambda führt zu einer stärkeren Regularisierung, wodurch mehr Koeffizienten auf null gesetzt werden. Wenn ein Koeffizient auf null gesetzt wird, heißt das er wird als nicht signifikant befunden und aus dem Modell ausgeschlossen. 
+
+"cv" steht hier für Kreuzvalidierung, was in Kombination mit LASSO, Elastic Net oder Ridge dazu verwendet wird, den optimalen Wert für den Regularisierungsparameter lambda zu finden. Der Punkt auf der x-Achse, der den niedrigsten mittleren Kreuzvalidierungsfehler (= Mean-Squared Error) hat, entspricht dem besten lambda-Wert, hier: 0.0197. Dies ist der Wert, der das Modell mit der besten Vorhersagegenauigkeit auf den Validierungsdatensatz liefert. Im Zuge der LASSO-Analyse wurden keine der Kovariablen auf null gesetzt, da diese vom Modell als signifikant identifiziert wurden.
+
+**Interpretation der Koeffizienten**
+
+Die resultierenden Koeffizienten des Modells können wie folgt interpretiert werden:
+
+* die **Intercept (49.9422)** ist der geschätzte Wert von "Education", wenn alle anderen unabhängigen Variablen (Fertility, Agriculture, Catholic, Infant Mortality) gleich null sind. In diesem Kontext ist es der Basiswert der Bildung, wenn keine der erklärenden Variablen vorhanden ist.
+* **Fertility** und **Agriculture** haben negative Koeffizienten, was darauf hindeutet, dass höhere Werte dieser Variablen mit niedrigeren Bildungsniveaus verbunden sind.
+* **Catholic** und **Infant Mortality** haben positive Koeffizienten, was bedeutet, dass höhere Werte dieser Variablen mit höheren Bildungsniveaus verbunden sind.
+
+Diese Trends entsprechen dem unter Punkt 2.3 genannte Modell #1 - zusammenfassend trägt LASSO daher hier keine nennenswerten Mehrwert zur Analyse bei.
+
+**Die angepasste LASSO-Modellgleichung lautet:**
+$$Education_i = 49.9422 - 0.5170 \times x_{Fertility,i} + - 0.2279 \times x_{Agriculture,i} + 0.0823 \times x_{Catholic,i} + 0.2740 \times x_{Infant.Mortality,i}$$
+Zuletzt wurde noch überprüft, wie sich die Koeffizienten verändern, wenn statt des Lambda-Minimalwerts ein strengerer Lambda-Wert gewählt wird - nämlich der größtmögliche Lambda-Wert, bei dem der Fehler noch innerhalb eines Standardfehlers des Minimalwerts liegt. Dieser Wert (hier: 0.982) und der Minimalwert für Lambda sind im LASSO-Plot oberhalb durch zwei strichlierte Linien markiert. 
+
+Wie nachfolgende Koeffizientenausgabe zeigt, wird bei Verwendung des größeren Lambda-Werts die Variable **Infant Mortality auf 0 gesetzt** und fällt dadurch aus der Modellierung heraus. Die Koeffizienten der übrigen Variablen (Fertility, Agriculture, Catholic) sind etwas kleiner, zeigen aber dieselben Trends wie zuvor. 
+
+```{r lasso2, echo=TRUE, message=FALSE, warning=FALSE, comment=">", fig.height= 3.5}
+
+# Wahl des zweiten Lambda-Schwellenwerts (strenger)
+sbest_lambda <- lasso_model$lambda.1se
+sbest_lambda
+
+# Strengeres LASSO-Modell
+final_lasso_model2 <- glmnet(x, y, alpha = 1, lambda = sbest_lambda)
+
+# Koeffizienten des strengeren Modells
+coef(final_lasso_model2)
+
+```
+\pagebreak
+
+# Aufgabe 3: USA
+
+## 3.1 Aufgabenstellung
+
+* Wir kehren zurück zu den Variablen “Population”, “Income”, “Illiteracy”, “Life.Exp”, “Murder”, “HS Grade”
+und “Frost” aus dem R Datensatz state.x77. 
+* Passen Sie für die oben genannten Variablen ein lineares Modell (lm) an, das “Murder” durch die übrigen Variablen erklärt, soweit dies zulässig ist.
+
+## 3.2 Beschreibung des Datensatzes
+
+- Population (Schätzung der Bevölkerungsanzahl zum 1. Juli 1975)
+- Income (Pro-Kopf-Einkommen in 1974, in $)
+- Illiteracy (Analphabetismus in 1970, in %)
+- Life Exp (Lebenserwartung in Jahren von 1969-71)
+- Murder (Mord und nicht-fahrlässige Tötungsrate pro 100.000 Einwohner in 1976)
+- HS Grad (Personen mit High School Abschluss in 1970, in %)
+- Frost (durchschnittliche Anzahl von Tagen an denen die Mindesttemperatur von 1931-1960 in einer Haupt- oder Großstadt unter dem Gefrierpunkt lag)
+- Area (Landfläche in Quadratmeilen, mi²; nicht Teil der Aufgabenstellung)
+
+```{r}
+glimpse(state.x77)
+class(state.x77)
+```
+
+## 3.3 Scatterplots
+
+Zunächst wurden Scatterplots erstellt, um einen Überblick darüber zu erhalten, welche Variablen mit "Murder" in einem linearen Zusammenhang stehen könnten:
+
+```{r}
+rm(data)
+data<-as.data.frame(state.x77) %>%
+  rename(Life_Exp = "Life Exp",
+         HS_Grad = "HS Grad")
+```
+
+``` {r echo=FALSE, comment=">", fig.height= 8, fig.width= 8, warning=FALSE}
+panel.hist <- function(x, ...)
+{
+usr <- par("usr"); on.exit(par(usr))
+par(usr = c(usr[1:2], 0, 1.5) )
+h <- hist(x, plot = FALSE)
+breaks <- h$breaks; nB <- length(breaks)
+y <- h$counts; y <- y/max(y)
+rect(breaks[-nB], 0, breaks[-1], y, col = "cyan", ...)
+}
+
+panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
+{
+usr <- par("usr"); on.exit(par(usr))
+par(usr = c(0, 1, 0, 1))
+r <- abs(cor(x, y))
+txt <- format(c(r, 0.123456789), digits = digits)[1]
+txt <- paste0(prefix, txt)
+if(missing(cex.cor)) cex.cor <- 0.8/strwidth(txt)
+text(0.5, 0.5, txt, cex = cex.cor * r, col = ifelse(r>0.5,2,1))
+}
+
+pairs(data, lower.panel = panel.smooth, upper.panel = panel.cor, diag.panel = panel.hist,las=1)
+```
+Da wir sehen, dass die Variable "HS_Grad" mit nahezu allen anderen Variablen sehr gut korreliert, ist diese als erklärende Variable auszuschließen. Gleiches gilt für "Illiteracy".
+
+``` {r echo=FALSE, comment=">", fig.height= 8, fig.width = 8, warning=FALSE}
+data2 <- data %>% select(-HS_Grad, -Illiteracy)
+
+panel.hist <- function(x, ...)
+{
+usr <- par("usr"); on.exit(par(usr))
+par(usr = c(usr[1:2], 0, 1.5) )
+h <- hist(x, plot = FALSE)
+breaks <- h$breaks; nB <- length(breaks)
+y <- h$counts; y <- y/max(y)
+rect(breaks[-nB], 0, breaks[-1], y, col = "cyan", ...)
+}
+
+panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
+{
+usr <- par("usr"); on.exit(par(usr))
+par(usr = c(0, 1, 0, 1))
+r <- abs(cor(x, y))
+txt <- format(c(r, 0.123456789), digits = digits)[1]
+txt <- paste0(prefix, txt)
+if(missing(cex.cor)) cex.cor <- 0.8/strwidth(txt)
+text(0.5, 0.5, txt, cex = cex.cor * r, col = ifelse(r>0.5,2,1))
+}
+
+pairs(data2, lower.panel = panel.smooth, upper.panel = panel.cor, diag.panel = panel.hist,las=1)
+```
+Nun sind nurmehr Variablen übrig, welche als erklärende Variablen nicht ausreichend (R >= 0.5) miteinander korrelieren.
+
+## 3.4 Überprüfung der statistischen Voraussetzungen
+
+### Residuen und Summary
+
+```{r residuals3, fig.height=8, fig.width=8, echo=FALSE, warning=FALSE, fig.align='center'}
+modell <- lm(Murder ~ ., data2)
+par(mfrow = c(2, 2))
+plot(modell)
+```
+
+``` {r echo=FALSE, comment=">", fig.height= 4}
+summary(modell)
+# explanatory<-cbind(data[,1:2],data[,4:5])
+# plot(explanatory)
+# cor(explanatory)
+```
+
+In unserem ersten erstellten Modell sehen wir, dass nicht alle Variablen zur Erklärung herangezogen werden können. Income spielt mit einem p-Wert von 0.530396 keine signifikante Rolle. Die Area spielt im Vergleich zu den übrigen Variablen auch nur eine untergeordnete Rolle, wurde aber mittels t-Test (dem aufgrund der normalverteilten Residuen lt. Q-Q Plot vertraut werden darf) mit einem p-Wert von 0.01584 als schwach signifikant bewertet.
+
+* Im Plot **Residuals vs. Fitted** ist eine gleichmäßig verteilte Punktewolke zu sehen, welche 1) auf keinen systematischen Fehler hinweist (gemeinsam mit dem Median, der nahezu bei 0 liegt), 2) zeigt, dass die Residuen homoskedastisch sind und 3) auch keine Korrelationen erkennen lässt. Die Bedingungen für ein lineares Regressionsmodell sind somit erfüllt.
+* Im Plot **Residuals vs. Leverage** sehen wir eine Beobachtung "Alaska", welche exakt auf der Cooks Distance liegt und daher vermutlich eine große Hebelwirkung erzielt. Diese ist daher als Ausreißer einzustufen und zu entfernen. Es existieren noch zwei weitere Beobachtungen "Nevada" und "Hawaii", welche eine relativ große Hebelwirkung aufweisen und nahe an der Cooks Distance liegen - jedoch noch innerhalb des akzeptablen Bereichs, weshalb sie nicht entfernt wurden.
+* Der Plot **Scale Location** weist eine leichte Kurve auf, vermutlich verursacht durch die Variablen Hawaii, Maine und Nevada. Diese erscheint jedoch akzeptabel.
+* Der **Q-Q Residuals** Plot zeigt, dass die Daten zum größten Teil an oder sehr Nahe bei der Geraden liegen. Die Residuen können somit als normalverteilt bewertet werden. Das Durchführen von t-Tests ist daher hier grundsätzlich erlaubt.
+
+Im folgenden Schritt wurden die oben genannte Variable Income (als nicht ausreichend erklärende Variable) sowie die Beobachtung "Alaska" als Ausreißer entfernt:
+
+```{r}
+data3 <- data2 %>% select(-Income)
+data3 <- data3[-2,]
+```
+
+```{r}
+modell_new <- lm(Murder ~ ., data3)
+summary(modell_new)
+```
+
+```{r residuals3.2, fig.height=8, fig.width=8, echo=FALSE, warning=FALSE, fig.align='center'}
+par(mfrow = c(2, 2))
+plot(modell_new)
+
+data4 <- data3 %>% select(-Murder)
+cor(data4)
+```
+Unser neues Modell zeigt nurmehr statistisch erklärende Daten, wobei Area (p-Value von 0.029819) und Population (p-Value von 0.023509) im Vergleich einen deutlich geringeren Einfluss haben. 
+Der Median (0.0295) zeigt außerdem, dass die Daten nahe der Null-Linie verteilt sind und das Modell daher gültig sein sollte. Ebenso zeigen die erklärenden Koariablen keine Zusammenhänge / Korrelationen untereinander (< 0.5).
+
+### Regressionsmodell
+
+Das daraus reslultierende Regressionsmodell lautet: 
+$$Murder_i = \alpha + \beta_{Population} \times x_{Population,i} + \beta_{Life_Exp} \times x_{Life_Exp,i} + \beta_{Frost} \times x_{Frost,i} + \beta_{Area} \times x_{Area,i} + \varepsilon_i$$
+
+### Modellgleichung
+
+Die mit den errechneten Koeffizienten angepasste Modellgleichung lautet demnach: 
+$$Murder_i = (1.414e+02) + (1.430e-04) \times x_{Population,i} + -1.879e+00 \times x_{Life_Exp,i} + (-2.135e-02) \times x_{Frost,i} + (1.246e-05) \times x_{Area,i}$$
+
+## 3.5 Erweiterung: Elastic Net
+
+Um zu veranschaulichen, welchen Einfluss LASSO, Ridge und Elastic Net Regressionsalgorithmen auf diesen (bereinigten) Datensatz haben, sind im Anschluss folgende Szenarien dargestellt:
+
+1) 100% LASSO (alpha = 1)
+2) 100% Ridge (alpha = 0)
+3) 50%-50% Elastic Net (alpha = 0.5)
+
+
+```{r elastic net 3.1, echo=FALSE, message=FALSE, warning=FALSE, comment=">", fig.height= 3.5}
+library(glmnet)
+library(caret)
+lambda.grid <- 10^seq(-3,8, length=100) # für Plot 1
+
+data<-as.data.frame(state.x77) %>%
+  rename(Life_Exp = "Life Exp",
+         HS_Grad = "HS Grad")
+data2 <- data %>% select(-HS_Grad, -Illiteracy)
+
+# Daten ohne Ausreißer (Alaska), jedoch mit Income
+elnet_data <- data2[-2,]
+
+# Extrahiere die relevanten Variablen
+X <- as.matrix(elnet_data[, c("Population", "Income", "Life_Exp", "Frost", "Area")])
+y <- elnet_data$`Murder`
+```
+
+```{r elastic net 3.2, echo=TRUE, message=FALSE, warning=FALSE, comment=">", fig.height= 3.5}
+# Plot 1a: LASSO - Verlauf der Koeffizienten/Variablen entlang Log Lambda
+fitL <- glmnet(x=X, y=y, alpha=1, lambda= lambda.grid)
+plot(fitL,xvar="lambda",label=TRUE, main = "LASSO (100 %) \n")
+
+# Plot 1b: LASSO - Kreuzvalidierung, um den besten Lambda-Wert zu finden
+cv_modelL <- cv.glmnet(X, y, alpha = 1)
+plot(cv_modelL, main = "LASSO (100 %) Regularisierungsparameter  \n")
+
+# Extrahiere den besten (niedrigsten) Lambda-Wert, Lasso
+best_lambdaL <- cv_modelL$lambda.min
+best_lambdaL
+
+# Passe das finale LASSO Modell mit dem besten Lambda-Wert an
+LASSO_fit <- glmnet(X, y, alpha = 1, lambda = best_lambdaL)
+
+# Koeffizienten des finalen LASSO Modells
+print(coef(LASSO_fit))
+```
+
+```{r elastic net 3.3, echo=TRUE, message=FALSE, warning=FALSE, comment=">", fig.height= 3.5}
+# Plot 2a: Ridge - Verlauf der Koeffizienten/Variablen entlang Log Lambda
+fitR <- glmnet(x=X, y=y, alpha=0, lambda= lambda.grid)
+plot(fitR,xvar="lambda",label=TRUE, main = "Ridge (100 %) \n")
+
+# Plot 2b: Ridge - Kreuzvalidierung, um den besten Lambda-Wert zu finden
+cv_modelR <- cv.glmnet(X, y, alpha = 0)
+plot(cv_modelR, main = "Ridge (100 %) Regularisierungsparameter  \n")
+
+# Extrahiere den besten (niedrigsten) Lambda-Wert, Lasso
+best_lambdaR <- cv_modelR$lambda.min
+best_lambdaR
+
+# Passe das finale Ridge Modell mit dem besten Lambda-Wert an
+Ridge_fit <- glmnet(X, y, alpha = 0, lambda = best_lambdaR)
+
+# Koeffizienten des finalen Ridge Modells
+print(coef(Ridge_fit))
+```
+
+```{r elastic net 3.4, echo=TRUE, message=FALSE, warning=FALSE, comment=">", fig.height= 3.5}
+
+# Plot 3a: Elastic Net - 50% - 50%
+fitEN <- glmnet(x=X, y=y, alpha=0.5, lambda= lambda.grid)
+plot(fitEN,xvar="lambda",label=TRUE, main = "Elastic Net (50-50) \n")
+
+# Plot 3b: Elastic Net - Kreuzvalidierung, um den besten Lambda-Wert zu finden
+cv_modelEN <- cv.glmnet(X, y, alpha = 0.5)
+plot(cv_modelEN, main = "Elastic Net (50-50) Regularisierungsparameter  \n")
+
+# Extrahiere den besten (niedrigsten) Lambda-Wert, Elastic Net
+best_lambdaEN <- cv_modelEN$lambda.min
+best_lambdaEN
+
+# Passe das finale Elastic Net Modell mit dem besten Lambda-Wert an
+elastic_net_fit <- glmnet(X, y, alpha = 0.5, lambda = best_lambdaEN)
+
+# Koeffizienten des finalen 50-50 Elastic Net Modells
+print(coef(elastic_net_fit))
+```
+
+Im Vergleich der LASSO und Ridge **Coefficients vs. Log Lambda Plots** zeigt sich, dass bei LASSO die Koeffizienten an einem gewissen Punkt rapide fallen/steigen, 0 erreichen und somit aus dem Modell ausscheiden. Bei der Ridge Regression hingegen nähern sich die Werte zwar 0 an, da es sich um eine Exponentialfunktion handelt, wird der Nullwert jedoch nie ganz erreicht.
+
+In allen drei Fällen (1 - LASSO, 2 - Ridge, 3 - Elastic Net 50/50) zeigt sich hinsichtlich der Zielvariable Murder ein ähnlicher Trend:
+
+* die **Income** Variable wurde von LASSO und Elastic Net eliminiert (nicht signifikant, wie schon zuvor mittels t-Test ermittelt), nicht jedoch von Ridge.
+* die Koeffizienten der **Population** und **Area** Variablen haben eine Steigung > 0. Dies bedeutet, dass ein **Anstieg der Bevölkerung und der Fläche eines Gebiets** im analysierten Datensatz mit einer **Zunahme der Mordrate** einhergeht (schwach signifikant lt. t-Test). 
+* die Koeffizienten der **Life Expectancy** und **Frost** Variablen haben eine Steigung < 0. Die negativen Steigungen für Lebenserwartung und Frost deuten auf eine umgekehrte Beziehung zur Mordrate hin. Dies bedeutet, dass **Verbesserungen der Lebenserwartung und eine Zunahme der Frosttage** mit einer **Verringerung der Mordrate** verbunden sind (hochsignifikant lt. t-Test). 
+
+
+
+```{r, echo = FALSE, error = FALSE, warning=FALSE, message=FALSE, results="hide", include=FALSE}
+## 3.6 Erweiterung: Bayes Regression mit state.x77 
+
+library(glmnet)
+library(Bolstad)
+library(LearnBayes)
+library(rstanarm)
+library(bayestestR)
+baymodel <- stan_glm(Murder ~ Population+Income+Life_Exp+Frost+Area, data=data2, seed=111)
+```
+```{r, include = FALSE, echo = TRUE, error = TRUE, comment=">", warning=FALSE, message=FALSE}
+print(baymodel, digits=5)
+hdi(baymodel)
+```
+
+\pagebreak
+
+# Aufgabe 4: Lake Huron
+
+## 4.1 Aufgabenstellung
+
+* Wir kehren zurück zum Datensatz “LakeHuron”. 
+* Passen Sie ein Modell an, das den Zeittrend modelliert.
+* Überprüfen Sie alle erforderlichen statistischen Voraussetzungen für die Gültigkeit dieses Modells mtihilfe der quality plots der Residuen.
+
+## 4.2 Beschreibung des Datensatzes und erste Untersuchung der Daten
+
+Jährliche Messungen des Pegels des Huron-Sees in Fuß, 1875-1972.
+
+```{r data, include=FALSE}
+
+data(LakeHuron)
+lh <- LakeHuron
+LH <- data.frame(Date = 1875:1972, 
+                 Depth  = LakeHuron,
+                 sd = runif(length(LakeHuron),0,1))
+
+LH$Date <- as.numeric(LH$Date)
+LH$Depth <- as.numeric(LH$Depth)
+LH$sd <- as.numeric(LH$sd)
+
+class(LH$Date)
+class(LH$Depth)
+class(LH$sd)
+
+model_lh <- lm(lh~time(lh))
+
+```
+
+```{r plot01, echo=FALSE}
+plot(lh, main="Lake Huron Wasserstand", xlab= "Date [year]", ylab="Depth [feet]")
+```
+
+```{r values, echo=FALSE, tidy=TRUE, comment=""}
+
+cat("Mean:             ", format(round(mean(lh), 2), nsmall = 2), "\n")      # Durchschnitt
+cat("Median:           ", format(round(median(lh), 2), nsmall = 2), "\n")    # Median
+cat("Min:              ", format(round(min(lh), 2), nsmall = 2), "\n")       # Minimaler Wert
+cat("Max:              ", format(round(max(lh), 2), nsmall = 2), "\n")       # Maximaler Wert
+cat("Variance:         ", format(round(var(lh), 2), nsmall = 2), "\n")       # Varianz
+cat("Standardeviation: ", format(round(sd(lh), 2), nsmall = 2), "\n")        # Standardabweichung
+
+```
+
+## 4.3 Modellanpassung
+
+```{r, echo=FALSE, comment=">", fig.width = 8, fig.height = 8}
+par(mfrow=c(2,2))
+plot(model_lh)
+```
+
+Anhand der Modellanpassung können folgende Aussagen getroffen werden:
+
+* Im Plot *_**Residuals vs Fitted:** Die Residuen schwanken relativ gleichmäßig um Null und die angepasste Rote Linie ist leicht gebogen, **was einen systematischen Fehler hindeutet bzw. eben korrelierte Daten**. Damit ist eine **Voraussetzung für eine multiple Regression nicht mehr gegeben**, weshalb die Analyse an dieser Stelle abgebrochen wird. Die Alternative wäre hier, das Regressionsmodell zu erstellen und anschließend zu sagen, dass dieses Modell aufgrund vorher genannten systematischen Fehlers nicht gültig wäre. 
+* Im Plot ***Scale-Location:** Die Standardabweichung der Residuen scheinen relativ konstant und es kann von einer Homoskedastizität ausgegangen werden.
+* Im Plot **Normal Q-Q:** Die Punkte liegen großteils auf beziehungsweise sehr nah an der Referenzlinie, weshalb man von einer Normalverteilung ausgehen kann.
+* Im Plot **Residuals vs Leverage:** Da alle Werte innerhalb der Cook’s Distance liegen kann kein Hebelpunkt indentifiziert werden. Denoch ist auch hier noch der Kurvenverlauf wie in Residuals vs Fitted in Teilen zu erkennen.
+
+## 4.4 Interpretation der Ergebnisse
+
+Der Datensatz Lake Huron kann unter anderem deswegen nicht weiter bearbeitet werden (im Sinne eines linearen Modells), da wir hier nur eine tatsächliche Variable vorliegen haben. Zwar können wir die Zeit ablesen, allerdings eignet sich ein lineares Modell nicht unbedingt als vorhersage der weiteren Entwicklung des Sees. 
+So wäre hier eine Zeitreihenanalyse deutlich sinnvoller, da es sich nicht um ein gewöhnliches Element handelt, was sich so gut linear berechnen lässt sondern auch deswegen, weil hier noch Umweltfaktoren vorhanden sind, die sich in den Messdaten zwar widerspiegeln (als Visualisierung), so aber nicht hinterlegt sind. Dazu gehören unter anderem Starkwetterereignisse oder auch Jahreszeiten im Allgemeinen. Dies deutet im Übrigen auch auf korrelierte Daten hin, was wiederrum eine Regel für verletzt, welche besagt, dass die Daten keinen systematischen Fehler aufweisen dürfen. Exakt das ist aber hier der Fall.
+
+\pagebreak
+
+# Aufgabe 5: Pima Indians
+
+## 5.1 Aufgabenstellung
+
+* Laden Sie den Datensatz ‘Pima.tr’ aus der library ‘MASS’. 
+* Ermittle ein logistisches Regressionsmodell, dass das Auftreten von Diabetes (‘type’) durch die übrigen unabhängigen Variablen Alter (age), Anzahl der Schwangerschaften (npreg), BMI, Glukosespiegel (glu), Blutdruck (bp), familiäre Häufung von Diabetesfällen (ped) und Hautfaltendickemessung am Oberarm (skin) erklärt. 
+* Schreibe die Modellgleichung an und interpretiere die Werte der Koeffizienten im Kontext.
+* Ermitteln Sie die prädiktive Qualität des Modells mithilfe einer Receiver Operating Characteristic (ROC) Kurve. 
+* Führen Sie auch die False Positive, False Negative, True Positive und True Negative Raten in einer Tabelle (Konfusionsmatrix) an.
+
+## 5.2 Beschreibung des Datensatzes 
+
+Eine Population von Frauen, die mindestens 21 Jahre alt waren, von den Pima-Indianern abstammten und in der Nähe von Phoenix, Arizona, lebten, wurde nach den Kriterien der Weltgesundheitsorganisation auf Diabetes getestet. Die Daten wurden vom US National Institute of Diabetes and Digestive and Kidney Diseases erhoben. 
+Dieser Datensatz stellt einen Teildatensatz eines größeren Datensatzes, bestehend aus Pima.tr (n=200), Pima.tr2 (n=132) und Pima.te (Pima.tr sowie weiteren Daten, welche allerdings fehlende Daten beinhalten) dar. Im Folgenden wird nun Pima.tr weiter betrachtet.
+
+* **npreg:** Anzahl der Schwangerschaften (Original [en]: number of pregnancies.)
+* **glu:** Plasmaglukosekonzentration bei einem oralen Glukosetoleranztest. (Original [en]: plasma glucose concentration in an oral glucose tolerance test.)
+* **bp:** diastolischer Blutdruck (mm Hg). (Original [en]: diastolic blood pressure (mm Hg).)
+* **skin:** Dicke der Trizepshautfalte (mm). (Original [en]: triceps skin fold thickness (mm).)
+* **bmi:** BMI (Original [en]: body mass index (weight in kg/(height in m)
+* **ped:** Diabetes-Stammbaumfunktion. (Original [en]: diabetes pedigree function.)
+* **age:** Alter in Jahren (Original [en]: age in years.)
+* **type:** Diabetis ja/nein (Original [en]: Yes or No, for diabetic according to WHO criteria.)
+
+```{r , message=FALSE}
+suppressMessages(library(MASS))
+suppressMessages(library(corrplot))
+suppressMessages(library(pROC))
+suppressMessages(library(magrittr))
+suppressMessages(library(tidyr))
+suppressMessages(library(dplyr))
+
+head(Pima.tr)
+str(Pima.tr)
+data0_Pimatr <- Pima.tr
+```
+
+## 5.3 Entfernen korrelierender Variablen
+
+Da wir das Auftreten von Diabetes (Variable 'type' durch die anderen Variablen erklären wollen, müssen wir zuerst einmal schauen, ob Variablen gibt, die - von type abgesehen - miteinander korrelieren und diese entfernen.
+
+``` {r echo=FALSE, comment=">", fig.height= 8, fig.width= 8, warning=FALSE}
+panel.hist <- function(x, ...)
+{
+usr <- par("usr"); on.exit(par(usr))
+par(usr = c(usr[1:2], 0, 1.5) )
+h <- hist(x, plot = FALSE)
+breaks <- h$breaks; nB <- length(breaks)
+y <- h$counts; y <- y/max(y)
+rect(breaks[-nB], 0, breaks[-1], y, col = "cyan", ...)
+}
+
+panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
+{
+usr <- par("usr"); on.exit(par(usr))
+par(usr = c(0, 1, 0, 1))
+r <- abs(cor(x, y))
+txt <- format(c(r, 0.123456789), digits = digits)[1]
+txt <- paste0(prefix, txt)
+if(missing(cex.cor)) cex.cor <- 0.8/strwidth(txt)
+text(0.5, 0.5, txt, cex = cex.cor * r, col = ifelse(r>0.5,2,1))
+}
+
+pairs(data0_Pimatr, lower.panel = panel.smooth, upper.panel = panel.cor, diag.panel = panel.hist,las=1)
+```
+Wir sehen, dass die Variablen 'skin' und 'bmi' stark miteinander korrelieren. Daher müsste eine dieser Variablen entfernt werden. Weiters korrelieren die Variablen 'npreg' und 'age' stark miteinander. 
+
+Die Variable 'bmi' ist ein berechneter Wert, welcher sich aus zwei gemessenen Werten zusammen setzt. Zudem ist Korrelation mit type etwas höher verglichen zu skin. Daher wird die Variable 'skin' aus dem Datensatz entfernt. 
+
+Die Variable 'npreg' steht für die Anzahl der Schwangerschaften und ist damit rein für Frauen relevant, während 'age' ein Faktor ist, welche für Frauen und Männer relevant ist. Es wird daher die Variable 'npreg' entfernt um die Korrelation eher allgemein gültig zu halten.
+
+``` {r echo=FALSE, comment=">", fig.height= 8, fig.width = 8, warning=FALSE}
+library(tidyverse)
+#data1_Pimatr <- data0_Pimatr %>% select(-npreg, -skin)
+
+data1_Pimatr <- data0_Pimatr 
+data1_Pimatr$npreg <- NULL
+data1_Pimatr$skin <- NULL
+
+
+panel.hist <- function(x, ...)
+{
+usr <- par("usr"); on.exit(par(usr))
+par(usr = c(usr[1:2], 0, 1.5) )
+h <- hist(x, plot = FALSE)
+breaks <- h$breaks; nB <- length(breaks)
+y <- h$counts; y <- y/max(y)
+rect(breaks[-nB], 0, breaks[-1], y, col = "cyan", ...)
+}
+
+panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
+{
+usr <- par("usr"); on.exit(par(usr))
+par(usr = c(0, 1, 0, 1))
+r <- abs(cor(x, y))
+txt <- format(c(r, 0.123456789), digits = digits)[1]
+txt <- paste0(prefix, txt)
+if(missing(cex.cor)) cex.cor <- 0.8/strwidth(txt)
+text(0.5, 0.5, txt, cex = cex.cor * r, col = ifelse(r>0.5,2,1))
+}
+
+pairs(data1_Pimatr, lower.panel = panel.smooth, upper.panel = panel.cor, diag.panel = panel.hist,las=1)
+```
+
+Wir haben hier prinzipiell die Situation, dass die Variable type nominal-skaliert ist mit zwei Ausprägungen "ja" und "nein" (=kategorial). Dadurch ergibt sich eine Binomial-Verteilung. Als Folge ist hier eine logistische Regression anzuwenden.
+
+Zwischen den erklärenden Variablen (ausgenommen type, welche erklärt werden soll) ist keine Korrelation mehr erkennbar. Da die Grundvoraussetzung, dass Kovariablen nicht miteinander korrelieren dürfen (R < 0.5) nun erfüllt ist, kann mit diesem Datensatz weitergearbeitet werden.
+
+## 5.4 Aufstellen des generalisierten linearen Modells
+
+``` {r echo=TRUE, comment=">", fig.height= 4}
+(modell_glm <- glm(type~.,data=data1_Pimatr,family=binomial(link = "logit")))
+summary(modell_glm)
+```
+
+Die Variable bp trägt nichts zum Regresionsmodell bei und werden dabei entfernt.
+
+```{r}
+data2_Pimatr <- data1_Pimatr
+data2_Pimatr$bp <- NULL
+(modell_glm_2 <- glm(type~.,data=data2_Pimatr,family=binomial(link = "logit")))
+summary(modell_glm_2)
+```
+Wir haben nun nur mehr Variablen, welche zum Modell etwas beitragen. Wir überprüfen nun die Residuen Plots.
+
+```{r}
+plot(modell_glm_2)
+```
+
+## 5.5 Erste Interpretation der Ergebnisse
+
+Mithilfe der oben angeführten Plots (ausgenommen der Scatterplots) werden nun die Anforderungen für ein generalisiertes lineares Modell geprüft. 
+
+Auf Basis folgender Quelle: 
+https://schmidtpaul.github.io/crashcouRse/intro_glm_carrot.html
+Punkt: "Lösung 2: Generalisierte Modelle"
+
+... fallen zwei Annahmen für die Residuen weg, welche bei linearen Modellen wichtig sind:
+* Varianzhomogenität
+* Normalverteilung der Fehler
+
+Nicht zu vergessen ist hierbei, dass wir durch die link-funktion "logit" eine logistische Transformation durchgeführt haben. 
+
+Gemäß Recherche scheint der Plot "Residuals vs. fitted" eine übliche Verteilung der Residuen bei einer binomial Verteilung darzustellen und wäre daher in Ordnung.
+
+Jedenfalls scheint hier die bimodalität nicht unbedingt zu stören und auch die beiden leichten Ränder, welche im Q-Q Plot zu sehen sind, dürften das Ergebnis kaum beeinflussen.
+
+Der Plot Residuals vs. Leverage zeigt einen Datenpunkt (48) an, welcher weitab der anderen Datenpunkt liegt. Jedoch befindet sich dieser nach wie vor innerhalb der Cook's Distance und dürfte daher keinen zu starken Einfluss haben, so dass er eventuell das Modell aushebeln könnte. Wir können diesen daher im Datensatz belassen.
+
+Auf Basis folgender Quelle:
+http://giscience.courses-pages.gistools.geog.uni-heidelberg.de/einfuerung_statistik/generalisierte-lineare-modelle-f%C3%BCr-z%C3%A4hldaten.html
+
+gilt es zu beachten, dass es seitens der generalisierten linearen Modelle keinen R^2 Wert mehr gibt, die Confidence aber anders abschätzbar ist, nämlich:
+
+```{r}
+modell_glm_2$deviance/modell_glm_2$null.deviance
+```
+Demnach scheint das Modell nicht so schlecht zu sein, da deutlicher größer als 0.5.
+
+## 5.6 Modellgleichung (logistisch)
+
+```{r}
+modell_glm_2$coefficients
+```
+Die Grundgleichung lautet wie folgt
+
+$$logit_(type_i) = \alpha + \beta_{glu} \times x_{glu,i} + \beta_{bmi} \times x_{bmi,i} + \beta_{ped} \times x_{ped,i}  + \beta_{age} \times x_{age,i}  + \varepsilon_i$$
+
+Das Modell daher:
+
+$$logit_(type_i) = -9.97138818 + 0.03125508 \times x_{glu,i} + 0.07703027 \times x_{bmi,i} + 1.71979415 \times x_{ped,i} + 0.05860297 \times x_{age,i}  + \varepsilon_i$$
+## 5.7 Umkehrung der linearen Transformation
+
+Um wieder zu den Originaldaten zurückzugelangen, muss das durch Logarithmierung erstellte Modell wieder umgeformt werden. 
+
+**Hierfür gilt:**
+
+_Für die Umkehrung des Terms sowie dessen Interpretation wurde ChatGPT zu Hilfe genommen!_
+
+$$p_i = 1 - \frac{1}{1 + e^{-9.97138818 + 0.03125508 \times x_{glu,i} + 0.07703027 \times x_{bmi,i} + 1.71979415 \times x_{ped,i} + 0.05860297 \times x_{age,i}}}$$
+
+Daraus folgt:
+
+$$p_i = 1 - \frac{1}{1 + 4.662204 \times 10^{-5} \times (1.031777)^{x_{glu,i}} \times (1.080150)^{x_{bmi,i}} \times (5.585137)^{x_{ped,i}} \times (1.060360)^{x_{age,i}}}$$
+## 5.8 Interpretation des Ergebnisses
+
+Der Interzept ist mit 4,6*-10^5 sehr (!) gering, daher ist die Basiswahrscheinlichkeit NICHT an Diabetis zu erkranken recht gering. Die Frage ist hier, ob das Ergebnis so stimmen kann. 
+Ein Anstieg der Plasmaglukosekonzentration um eine Einheit ist mit einer Erhöhung des Logits für Diabetes um 0.031 verbunden. Dies bedeutet, dass höhere Glukosewerte die Wahrscheinlichkeit für Diabetes erhöhen.
+Ein Anstieg des BMI um eine Einheit ist mit einer Erhöhung des Logits für Diabetes um 0.077 verbunden. Höherer BMI erhöht die Wahrscheinlichkeit für Diabetes.
+Ein Anstieg der Diabetes-Stammbaumfunktion um eine Einheit ist mit einer Erhöhung des Logits für Diabetes um 1.72 verbunden. Dies deutet darauf hin, dass eine stärkere genetische Prädisposition (gemessen durch die Stammbaumfunktion) die Wahrscheinlichkeit für Diabetes stark erhöht.
+Ein Anstieg des Alters um ein Jahr ist mit einer Erhöhung des Logits für Diabetes um 0.0586 verbunden. Ältere Menschen haben eine höhere Wahrscheinlichkeit, an Diabetes zu erkranken.
+
+_Ende der Zuhilfenahme von ChatGPT_
+
+
+## 5.9 ROC Kurve
+
+```{r}
+predictions_filtered <- predict(modell_glm_2, data2_Pimatr, type="response")
+roc_curve_filtered <- roc(data2_Pimatr$type, predictions_filtered)
+plot(roc_curve_filtered,main ="ROC 'Kurve' -- Logistische Regression ")
+as.numeric(roc_curve_filtered$auc)
+```
+
+Für Modell 2 ergibt sich ein ROC-Wert von 0.8385695, somit hat die Entfernung der Koeffizient npreg, bp und skin, die Qualität des Modells nicht signifikant beeinflusst.
+
+## 5.10 Erstellung der Confusion-Matrix
+
+```{r}
+Pima_Original <- Pima.tr
+Pima_Original$truefalse <- ifelse(predict(modell_glm_2, type = "response") > 0.5, "Yes", "No")
+```
+
+```{r}
+data2_Pimatr$truefalse <- ifelse(predict(modell_glm_2, type = "response") > 0.5, "Yes", "No")
+```
+
+
+```{r message=FALSE}
+library(caret)
+model2 = table(predicted = data2_Pimatr$truefalse, actual = Pima_Original$type)
+model2_con_mat = confusionMatrix(model2, positive = "Yes")
+c(model2_con_mat$overall["Accuracy"],
+  model2_con_mat$byClass["Sensitivity"],
+  model2_con_mat$byClass["Specificity"])
+model2_con_mat
+```
+
+Bei der Konfusionsmatrix handelt es sich um ein binäres Zweiklassenmodell, welches die Verteilung der vorhergesagten und tatsächlichen Werte widerspiegelt.
+
+In diesem Fall:
+
+True Positives: 38
+True Negatives: 116
+False Positives: 16
+False Negatives: 30
+
+Die Genauigkeit umschreibt die insgesamt richtig klassifizierten Werte im Verhältnis zu allen klassifzierten. In unserem sind das 154 korrekt vorhergesasgte Werte von 200, was einer Genauigkeit von 77% entspricht.
+
+Die Sensitivität, oder auch True-Positive-Rate, umschreibt die Fälle in denen positiv klassifizierte Datenpunkte auch tatsächlich positiv waren. Diese beträgt in unserem Fall 55,88%
+
+Die Spezifizität, oder auch True Negative Rate, misst alle Fälle in denen negativ klassifizierte Datenpunkte auch tatsächlich negativ waren. Diese beträgt in unserem Fall 87,88%.
+
+## 5.11 Cross Validation 
+
+Für die Cross-Validation wurde das Jackknifing verwendet. Hier werden zuerst die Daten "zerschnitten" und anschließend nach und nach durchgetestet.
+
+```{r}
+library(glmnet)
+jack_data<-as.data.frame(data1_Pimatr)
+X <- as.matrix(jack_data[, c("glu", "bp", "bmi", "ped", "age")])
+#y <- jack_data$`type`
+y <- ifelse(jack_data$type == "Yes", 1, 0)
+
+lambda.grid <- 10^seq(-3, 8, length=100)
+
+n <- nrow(jack_data)
+errors <- numeric(n)
+
+for (i in 1:n) {
+  X_train <- X[-i,]
+  y_train <- y[-i]
+  X_test <- X[i,,drop=FALSE]
+  y_test <- y[i]
+  cv_fit <- cv.glmnet(x=X_train, y=y_train, alpha=1, lambda=lambda.grid)
+  best_lambda <- cv_fit$lambda.min
+  fitL <- glmnet(x=X_train, y=y_train, alpha=1, lambda=best_lambda)
+  y_pred <- predict(fitL, newx=X_test, s=best_lambda)
+  errors[i] <- (y_test - y_pred)^2
+}
+
+mse <- mean(errors)
+cat("Mean Squared Error: ", mse, "\n")
+
+```
+Der Mean Squared Error ist mit `r mse` recht niedrig, was für eine gute Qualität des Modells spricht.
+
+
+
+
+## 5.12 Elastic Net
+
+LASSO-Regression (Least Absolute Shrinkage and Selection Operator) ist eine Methode der linearen Regression, die durch L1-Regularisierung eine Strafe für die Summe der absoluten Werte der Regressionskoeffizienten hinzufügt, wodurch einige Koeffizienten auf Null gesetzt werden können. Das führt zu einer Schrumpfung der Koeffizienten und ermöglicht die Auswahl der wichtigsten Variablen, wodurch das Modell vereinfacht und die Überanpassung reduziert werden soll.
+
+Ridge hingegeben geht von der Annahme aus, dass alle Variablen irgendwie wichtig sind und setzt diese ggf. nahe Null, wirft sie aber eher nicht raus.
+
+Elastische Netze bzw. Elastic Nets sind eine Möglichkeit beide Technologien miteinander zu verbinden um auf ein möglichst ideales Ergebnis zu kommen.
+
+Um die Datenvoraussetzung zu erfüllen, wurde vorab die mit anderen Kovariablen korrelierende Examination-Variable entfernt.
+
+```{r elastic net 5.1, echo=FALSE, message=FALSE, warning=FALSE, comment=">", fig.height= 3.5}
+library(glmnet)
+library(caret)
+lambda.grid <- 10^seq(-3,8, length=100) # für Plot 1
+
+elnet_data<-as.data.frame(data1_Pimatr)
+
+# Extrahiere die relevanten Variablen
+X <- as.matrix(elnet_data[, c("glu", "bp", "bmi", "ped", "age")])
+y <- elnet_data$`type`
+```
+
+```{r elastic net 5.2, echo=TRUE, message=FALSE, warning=FALSE, comment=">", fig.height= 3.5}
+# Plot 1a: LASSO - Verlauf der Koeffizienten/Variablen entlang Log Lambda
+#y_binary <- ifelse(elnet_data$type == "Yes", 1, 0)
+fitL <- glmnet(x=X, y=y, family="binomial", alpha=1, lambda= lambda.grid)
+plot(fitL,xvar="lambda",label=TRUE, main = "LASSO (100 %) \n")
+
+# Plot 1b: LASSO - Kreuzvalidierung, um den besten Lambda-Wert zu finden
+cv_modelL <- cv.glmnet(X, y, family="binomial", alpha = 1)
+plot(cv_modelL, main = "LASSO (100 %) Regularisierungsparameter  \n")
+
+# Extrahiere den besten (niedrigsten) Lambda-Wert, Lasso
+best_lambdaL <- cv_modelL$lambda.min
+best_lambdaL
+
+# Passe das finale LASSO Modell mit dem besten Lambda-Wert an
+LASSO_fit <- glmnet(X, y, family="binomial", alpha = 1, lambda = best_lambdaL)
+
+# Koeffizienten des finalen LASSO Modells
+print(coef(LASSO_fit))
+```
+
+```{r elastic net 5.3, echo=TRUE, message=FALSE, warning=FALSE, comment=">", fig.height= 3.5}
+# Plot 2a: Ridge - Verlauf der Koeffizienten/Variablen entlang Log Lambda
+fitR <- glmnet(x=X, y=y, family="binomial", alpha=0, lambda= lambda.grid)
+plot(fitR,xvar="lambda",label=TRUE, main = "Ridge (100 %) \n")
+
+# Plot 2b: Ridge - Kreuzvalidierung, um den besten Lambda-Wert zu finden
+cv_modelR <- cv.glmnet(X, y=y, family="binomial", alpha = 0)
+plot(cv_modelR, main = "Ridge (100 %) Regularisierungsparameter  \n")
+
+# Extrahiere den besten (niedrigsten) Lambda-Wert, Lasso
+best_lambdaR <- cv_modelR$lambda.min
+best_lambdaR
+
+# Passe das finale Ridge Modell mit dem besten Lambda-Wert an
+Ridge_fit <- glmnet(X, y=y, family="binomial", alpha = 0, lambda = best_lambdaR)
+
+# Koeffizienten des finalen Ridge Modells
+print(coef(Ridge_fit))
+```
+
+```{r elastic net 5.4, echo=TRUE, message=FALSE, warning=FALSE, comment=">", fig.height= 3.5}
+
+# Plot 3a: Elastic Net - 50% - 50%
+fitEN <- glmnet(x=X, y=y, family="binomial", alpha=0.5, lambda= lambda.grid)
+plot(fitEN,xvar="lambda",label=TRUE, main = "Elastic Net (50-50) \n")
+
+# Plot 3b: Elastic Net - Kreuzvalidierung, um den besten Lambda-Wert zu finden
+cv_modelEN <- cv.glmnet(X, y=y, family="binomial", alpha = 0.5)
+plot(cv_modelEN, main = "Elastic Net (50-50) Regularisierungsparameter  \n")
+
+# Extrahiere den besten (niedrigsten) Lambda-Wert, Elastic Net
+best_lambdaEN <- cv_modelEN$lambda.min
+best_lambdaEN
+
+# Passe das finale Elastic Net Modell mit dem besten Lambda-Wert an
+elastic_net_fit <- glmnet(X, y=y, family="binomial", alpha = 0.5, lambda = best_lambdaEN)
+
+# Koeffizienten des finalen 50-50 Elastic Net Modells
+print(coef(elastic_net_fit))
+```
+
+In allen drei Fällen (1 - LASSO, 2 - Ridge, 3 - Elastic Net 50/50) zeigt sich hinsichtlich der Zielvariable ein ähnlicher Trend:
+
+* die bp Variable wurde von LASSO und Elastic Net eliminiert (nicht signifikant, wie schon zuvor ermittelt), nicht jedoch von Ridge
+* sämtliche anderen Koeffizienten haben eine Steigung > 0. Dies bedeutet, dass ein Anstieg bspw. des Glukosegehaltes 'glu' mit einem höheren Risiko für Diabetis behaftet ist, was ebenfalls für die Variablen BMI 'bmi', die Diabetes Pedigree Funktion 'ped', sowie für das Alter 'age' der Fall ist.
+
